@@ -103,4 +103,35 @@ export class LettaClientWrapper {
       ...options 
     });
   }
+
+  // Message operations
+  async listMessages(agentId: string, options?: any) {
+    return await this.client.agents.messages.list(agentId, options);
+  }
+
+  async createMessage(agentId: string, params?: any) {
+    return await this.client.agents.messages.create(agentId, params);
+  }
+
+  async streamMessage(agentId: string, params?: any) {
+    return await this.client.agents.messages.stream(agentId, params);
+  }
+
+  async createAsyncMessage(agentId: string, params?: any) {
+    return await this.client.agents.messages.createAsync(agentId, params);
+  }
+
+  async cancelMessages(agentId: string, runIds?: string[]) {
+    return await this.client.agents.messages.cancel(agentId, runIds ? { run_ids: runIds } : undefined);
+  }
+
+  async resetMessages(agentId: string, addDefaultMessages?: boolean) {
+    return await this.client.agents.messages.reset(agentId, { 
+      add_default_initial_messages: addDefaultMessages 
+    });
+  }
+
+  async compactMessages(agentId: string) {
+    return await this.client.agents.messages.compact(agentId);
+  }
 }

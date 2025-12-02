@@ -246,11 +246,35 @@ lettactl import my-agent-backup.json \
   --append-copy
 ```
 
+### Message Operations
+```bash
+# List agent conversation history
+lettactl messages my-agent --limit 10
+
+# Send a message to an agent
+lettactl send my-agent "Hello, how are you?"
+
+# Send with streaming response
+lettactl send my-agent "Tell me about Tokyo" --stream
+
+# Send asynchronous message
+lettactl send my-agent "Plan a 7-day itinerary" --async
+
+# Reset agent's conversation history
+lettactl reset-messages my-agent --add-default
+
+# Compact agent's message history (summarize)
+lettactl compact-messages my-agent
+
+# Cancel running message processes
+lettactl cancel-messages my-agent --run-ids "run1,run2"
+```
+
 ### View Resources
 ```bash
 lettactl get agents                    # List all agents
 lettactl describe agent my-agent       # Detailed agent info
-lettactl logs agent my-agent          # Recent conversations
+lettactl messages my-agent            # View conversation history
 ```
 
 ### Validate Configuration

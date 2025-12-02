@@ -9,6 +9,13 @@ import updateCommand from './commands/update';
 import exportCommand from './commands/export';
 import importCommand from './commands/import';
 import createCommand from './commands/create';
+import { 
+  listMessagesCommand, 
+  sendMessageCommand, 
+  resetMessagesCommand, 
+  compactMessagesCommand, 
+  cancelMessagesCommand 
+} from './commands/messages';
 
 // Validate required environment variables
 function validateEnvironment() {
@@ -142,17 +149,53 @@ program
     // TODO: Implement validate logic
   });
 
-// Logs command - show agent conversation logs
+// Message commands
+// List messages (replaces old logs command)
 program
-  .command('logs')
-  .description('Show agent conversation logs')
-  .argument('<resource>', 'resource type (agent)')
-  .argument('<name>', 'agent name')
-  .option('--tail <lines>', 'number of recent messages to show')
-  .action(async (resource, name, options) => {
-    console.log('Logs command:', resource, name, options);
-    // TODO: Implement logs logic
-  });
+  .command('messages')
+  .description('List agent conversation messages')
+  .argument('<agent>', 'agent name')
+  .option('-l, --limit <number>', 'number of messages to show', parseInt)
+  .option('--order <order>', 'sort order (asc|desc)', 'desc')
+  .option('--before <id>', 'show messages before this message ID')
+  .option('--after <id>', 'show messages after this message ID')
+  .option('-o, --output <format>', 'output format (table|json)', 'table')
+  .action(listMessagesCommand);
+
+// Send message to agent
+program
+  .command('send')
+  .description('Send a message to an agent')
+  .argument('<agent>', 'agent name')
+  .argument('<message>', 'message to send')
+  .option('--stream', 'stream the response')
+  .option('--async', 'send message asynchronously')
+  .option('--max-steps <number>', 'maximum processing steps', parseInt)
+  .option('--enable-thinking', 'enable agent reasoning')
+  .action(sendMessageCommand);
+
+// Reset agent messages
+program
+  .command('reset-messages')
+  .description('Reset an agent\'s conversation history')
+  .argument('<agent>', 'agent name')
+  .option('--add-default', 'add default initial messages after reset')
+  .action(resetMessagesCommand);
+
+// Compact agent messages
+program
+  .command('compact-messages')
+  .description('Compact an agent\'s conversation history')
+  .argument('<agent>', 'agent name')
+  .action(compactMessagesCommand);
+
+// Cancel running messages
+program
+  .command('cancel-messages')
+  .description('Cancel running message processes for an agent')
+  .argument('<agent>', 'agent name')
+  .option('--run-ids <ids>', 'comma-separated run IDs to cancel')
+  .action(cancelMessagesCommand);
 
 // Config command - show current Letta config
 program
