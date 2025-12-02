@@ -1,3 +1,10 @@
 node_modules
 dist
 __pycache__
+
+# Example project structure folders (users will create these)
+memory-blocks/
+files/
+tools/
+prompts/
+shared/
