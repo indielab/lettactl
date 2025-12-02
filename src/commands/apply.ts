@@ -1,5 +1,6 @@
 import { FleetParser } from '../lib/fleet-parser';
 import { LettaClientWrapper } from '../lib/letta-client';
+import { BlockManager } from '../lib/block-manager';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -34,7 +35,22 @@ export async function applyCommand(options: { file: string; agent?: string; dryR
     }
 
     const client = new LettaClientWrapper();
+    const blockManager = new BlockManager(client);
     const createdFolders = new Map<string, string>(); // folder name -> folder id
+    
+    // Load existing blocks for versioning
+    if (verbose) console.log('Loading existing blocks...');
+    await blockManager.loadExistingBlocks();
+    
+    // Process shared blocks first
+    const sharedBlockIds = new Map<string, string>();
+    if (config.shared_blocks) {
+      if (verbose) console.log('Processing shared blocks...');
+      for (const sharedBlock of config.shared_blocks) {
+        const blockId = await blockManager.getOrCreateSharedBlock(sharedBlock);
+        sharedBlockIds.set(sharedBlock.name, blockId);
+      }
+    }
     
     // Register required tools
     if (verbose) console.log('Registering tools...');
@@ -115,20 +131,28 @@ export async function applyCommand(options: { file: string; agent?: string; dryR
       }
       
       try {
-        // Create memory blocks
+        // Collect all block IDs (shared + agent-specific)
         const blockIds: string[] = [];
         
+        // Add shared blocks for this agent
+        if (agent.shared_blocks) {
+          for (const sharedBlockName of agent.shared_blocks) {
+            const sharedBlockId = sharedBlockIds.get(sharedBlockName);
+            if (sharedBlockId) {
+              blockIds.push(sharedBlockId);
+              if (verbose) console.log(`  Using shared block: ${sharedBlockName}`);
+            } else {
+              console.warn(`  Shared block not found: ${sharedBlockName}`);
+            }
+          }
+        }
+        
+        // Create agent-specific memory blocks
         if (agent.memory_blocks) {
           for (const block of agent.memory_blocks) {
-            if (verbose) console.log(`  Creating memory block: ${block.name}`);
-            const createdBlock = await client.createBlock({
-              label: block.name,
-              description: block.description,
-              value: block.value || '',
-              limit: block.limit
-            });
-            blockIds.push(createdBlock.id);
-            if (verbose) console.log(`  Created block: ${block.name}`);
+            if (verbose) console.log(`  Processing memory block: ${block.name}`);
+            const blockId = await blockManager.getOrCreateAgentBlock(block, agent.name);
+            blockIds.push(blockId);
           }
         }
 

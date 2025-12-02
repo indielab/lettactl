@@ -9,6 +9,7 @@ export interface SharedBlock {
   limit: number;
   value?: string;
   from_file?: string;
+  version?: string; // Optional user-defined version tag
 }
 
 export interface AgentConfig {
@@ -39,6 +40,7 @@ export interface MemoryBlock {
   limit: number;
   value?: string;
   from_file?: string;
+  version?: string; // Optional user-defined version tag
 }
 
 export interface LLMConfig {
