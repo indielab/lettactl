@@ -1,37 +1,25 @@
 import { LettaClientWrapper } from '../lib/letta-client';
+import { AgentResolver } from '../lib/agent-resolver';
+import { OutputFormatter } from '../lib/output-formatter';
+import { validateResourceType, validateRequired } from '../lib/validators';
+import { withErrorHandling } from '../lib/error-handler';
 
-export async function describeCommand(resource: string, name: string, options?: { output?: string }) {
-  if (resource !== 'agent' && resource !== 'agents') {
-    console.error('Error: Only "agent/agents" resource is currently supported');
-    process.exit(1);
+async function describeCommandImpl(resource: string, name: string, options?: { output?: string }) {
+  validateResourceType(resource, ['agent', 'agents']);
+  validateRequired(name, 'Agent name', 'lettactl describe agent <name>');
+
+  const client = new LettaClientWrapper();
+  const resolver = new AgentResolver(client);
+  
+  // Find agent by name
+  const { agent } = await resolver.findAgentByName(name);
+  
+  // Get full agent details
+  const agentDetails = await resolver.getAgentWithDetails(agent.id);
+  
+  if (OutputFormatter.handleJsonOutput(agentDetails, options?.output)) {
+    return;
   }
-
-  if (!name) {
-    console.error('Error: Agent name is required');
-    console.error('Usage: lettactl describe agent <name>');
-    process.exit(1);
-  }
-
-  try {
-    const client = new LettaClientWrapper();
-    
-    // Find agent by name
-    const agents = await client.listAgents();
-    const agentList = Array.isArray(agents) ? agents : ((agents as any).items || (agents as any).body || []);
-    const agent = agentList.find((a: any) => a.name === name);
-    
-    if (!agent) {
-      console.error(`Error: Agent "${name}" not found`);
-      process.exit(1);
-    }
-    
-    // Get full agent details
-    const agentDetails = await client.getAgent(agent.id);
-    
-    if (options?.output === 'json') {
-      console.log(JSON.stringify(agentDetails, null, 2));
-      return;
-    }
     
     // Display formatted information
     console.log(`Agent Details: ${name}`);
@@ -135,8 +123,6 @@ export async function describeCommand(resource: string, name: string, options?: 
       console.log(`Recent Messages: Unable to retrieve messages\n`);
     }
     
-  } catch (error: any) {
-    console.error('Describe command failed:', error.message);
-    process.exit(1);
-  }
 }
+
+export default withErrorHandling('Describe command', describeCommandImpl);

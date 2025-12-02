@@ -1,29 +1,20 @@
 import { LettaClientWrapper } from '../lib/letta-client';
+import { AgentResolver } from '../lib/agent-resolver';
+import { ResourceClassifier } from '../lib/resource-classifier';
+import { validateResourceType, validateRequired } from '../lib/validators';
+import { withErrorHandling } from '../lib/error-handler';
+import { normalizeResponse } from '../lib/response-normalizer';
 
-export async function deleteCommand(resource: string, name: string, options?: { force?: boolean }) {
-  if (resource !== 'agent' && resource !== 'agents') {
-    console.error('Error: Only "agent/agents" resource is currently supported');
-    process.exit(1);
-  }
+async function deleteCommandImpl(resource: string, name: string, options?: { force?: boolean }) {
+  validateResourceType(resource, ['agent', 'agents']);
+  validateRequired(name, 'Agent name', 'lettactl delete agent <name>');
 
-  if (!name) {
-    console.error('Error: Agent name is required');
-    console.error('Usage: lettactl delete agent <name>');
-    process.exit(1);
-  }
-
-  try {
-    const client = new LettaClientWrapper();
-    
-    // Find agent by name
-    const agents = await client.listAgents();
-    const agentList = Array.isArray(agents) ? agents : ((agents as any).items || (agents as any).body || []);
-    const agent = agentList.find((a: any) => a.name === name);
-    
-    if (!agent) {
-      console.error(`Error: Agent "${name}" not found`);
-      process.exit(1);
-    }
+  const client = new LettaClientWrapper();
+  const resolver = new AgentResolver(client);
+  const classifier = new ResourceClassifier(client);
+  
+  // Find agent by name
+  const { agent, allAgents } = await resolver.findAgentByName(name);
     
     if (!options?.force) {
       console.log(`This will permanently delete agent: ${name} (${agent.id})`);
@@ -34,38 +25,20 @@ export async function deleteCommand(resource: string, name: string, options?: { 
     console.log(`Deleting agent: ${name}...`);
     
     // Get agent details to find attached folders and blocks
-    const agentDetails = await client.getAgent(agent.id);
+    const agentDetails = await resolver.getAgentWithDetails(agent.id);
     
     // Delete attached folders if they're not shared
     const folders = (agentDetails as any).folders;
     if (folders) {
       console.log(`Checking attached folders...`);
       for (const folder of folders) {
-        // Check if this folder is attached to other agents
-        const otherAgents = agentList.filter((a: any) => a.id !== agent.id);
-        let folderShared = false;
+        // Check if folder is shared or used by other agents
+        const isShared = classifier.isSharedFolder(folder);
+        const usedByOthers = await classifier.isFolderUsedByOtherAgents(folder.id, agent.id, allAgents);
         
-        for (const otherAgent of otherAgents) {
-          try {
-            const otherDetails = await client.getAgent(otherAgent.id);
-            const otherFolders = (otherDetails as any).folders;
-            if (otherFolders && otherFolders.find((f: any) => f.id === folder.id)) {
-              folderShared = true;
-              break;
-            }
-          } catch (error) {
-            // Continue if we can't get other agent details
-          }
-        }
-        
-        // Only delete agent-specific folders, never shared ones
-        const isSharedFolder = folder.name?.includes('shared') || 
-                              folder.name?.includes('creative_direction_docs') ||
-                              folder.name?.includes('ada_strategy_docs');
-        
-        if (isSharedFolder) {
+        if (isShared) {
           console.log(`Keeping shared folder: ${folder.name || folder.id}`);
-        } else if (!folderShared) {
+        } else if (!usedByOthers) {
           console.log(`Deleting agent-specific folder: ${folder.name || folder.id}`);
           try {
             await client.deleteFolder(folder.id);
@@ -87,36 +60,12 @@ export async function deleteCommand(resource: string, name: string, options?: { 
     console.log(`Cleaning up memory blocks...`);
     try {
       const blocks = await client.listBlocks();
-      const blockList = Array.isArray(blocks) ? blocks : ((blocks as any).items || []);
-      
-      // Only check agent-specific blocks, never shared ones
-      const agentSpecificBlocks = blockList.filter((block: any) => {
-        if (!block.label) return false;
-        
-        // Never delete shared blocks
-        if (block.label.startsWith('shared_')) return false;
-        
-        // Look for blocks that contain the agent name or brand
-        const brandName = name.replace('draper-', '').replace('ada-', '');
-        return block.label.includes(brandName) || 
-               block.label.includes('_' + name) ||
-               block.label.includes(name + '_');
-      });
+      const blockList = normalizeResponse(blocks);
+      const agentSpecificBlocks = classifier.getAgentSpecificBlocks(blockList, name);
       
       for (const block of agentSpecificBlocks) {
         // Check if this block is still attached to any remaining agents
-        let blockInUse = false;
-        for (const otherAgent of agentList.filter((a: any) => a.id !== agent.id)) {
-          try {
-            const otherDetails = await client.getAgent(otherAgent.id);
-            if (otherDetails.blocks && otherDetails.blocks.find((b: any) => b.id === block.id)) {
-              blockInUse = true;
-              break;
-            }
-          } catch (error) {
-            // Continue
-          }
-        }
+        const blockInUse = await classifier.isBlockUsedByOtherAgents(block.id, agent.id, allAgents);
         
         if (!blockInUse) {
           console.log(`Deleting orphaned block: ${block.label}`);
@@ -133,9 +82,6 @@ export async function deleteCommand(resource: string, name: string, options?: { 
     }
     
     console.log(`Agent ${name} and associated resources deleted successfully`);
-    
-  } catch (error: any) {
-    console.error('Delete command failed:', error.message);
-    process.exit(1);
-  }
 }
+
+export default withErrorHandling('Delete command', deleteCommandImpl);

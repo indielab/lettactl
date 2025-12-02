@@ -2,9 +2,9 @@
 
 import { Command } from 'commander';
 import { applyCommand } from './commands/apply';
-import { getCommand } from './commands/get';
-import { deleteCommand } from './commands/delete';
-import { describeCommand } from './commands/describe';
+import getCommand from './commands/get';
+import deleteCommand from './commands/delete';
+import describeCommand from './commands/describe';
 
 // Validate required environment variables
 function validateEnvironment() {
