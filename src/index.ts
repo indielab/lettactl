@@ -3,7 +3,7 @@
 import { Command } from 'commander';
 import { applyCommand } from './commands/apply';
 import getCommand from './commands/get';
-import deleteCommand from './commands/delete';
+import deleteCommand, { deleteAllCommand } from './commands/delete';
 import describeCommand from './commands/describe';
 import updateCommand from './commands/update';
 import exportCommand from './commands/export';
@@ -79,6 +79,15 @@ program
   .argument('<name>', 'agent name')
   .option('--force', 'force deletion without confirmation')
   .action(deleteCommand);
+
+// Delete all command - bulk delete agents
+program
+  .command('delete-all')
+  .description('Delete multiple agents (with optional pattern matching)')
+  .argument('<resource>', 'resource type (agent|agents)')
+  .option('--pattern <pattern>', 'regex pattern to match agent names/IDs')
+  .option('--force', 'force deletion without confirmation')
+  .action(deleteAllCommand);
 
 // Create command - create new agents
 program
