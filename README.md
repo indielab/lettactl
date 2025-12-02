@@ -61,6 +61,8 @@ pnpm dev get agents
 npm run dev get agents
 ```
 
+> **Note**: Once we finalize hosting and distribution details, we'll streamline the installation process. For now, these development commands work well for testing and evaluation.
+
 ### Testing
 
 Run the comprehensive test suite:
