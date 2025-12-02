@@ -1,0 +1,88 @@
+# Complete Agent Fleet Configuration
+# kubectl-style declarative configuration for Letta agents
+
+shared_blocks:
+  - name: shared_guidelines
+    description: "Shared operational guidelines for all agents"
+    limit: 5000
+    from_file: "memory-blocks/shared/shared-guidelines.md"
+
+  - name: shared_archival_policies
+    description: "Shared archival memory guidelines for all agents"
+    limit: 5000
+    from_file: "memory-blocks/shared/shared-archival-policies.md"
+
+agents:
+  # Recipe Assistant Agent
+  - name: recipe-assistant
+    description: "AI chef assistant that helps with cooking, meal planning, and recipe creation"
+    llm_config:
+      model: "google_ai/gemini-2.5-pro"
+      context_window: 32000
+    system_prompt:
+      from_file: "prompts/recipe-system-prompt.md"
+    tools:
+      - archival_memory_insert
+      - archival_memory_search
+    memory_blocks:
+      - name: cooking_preferences
+        description: "User dietary preferences, allergies, and cooking skill level"
+        limit: 10000
+        from_file: "memory-blocks/recipe/cooking-preferences.md"
+
+      - name: recipe_history
+        description: "Previously made recipes and user feedback"
+        limit: 5000
+        from_file: "memory-blocks/recipe/recipe-history.md"
+        
+    folders:
+      - name: "recipe_knowledge"
+        files:
+          - "files/cooking-techniques.md"
+          - "files/ingredient-substitutions.md"
+          - "files/seasonal-ingredients.md"
+          
+    embedding: "letta/letta-free"
+
+  # Travel Planning Agent  
+  - name: travel-planner
+    description: "AI travel advisor that creates personalized itineraries and travel recommendations"
+    llm_config:
+      model: "google_ai/gemini-2.5-pro"
+      context_window: 64000
+    system_prompt:
+      from_file: "prompts/travel-system-prompt.md"
+    tools:
+      - tools/*  # Auto-discover all tools in tools directory
+      - archival_memory_insert
+      - archival_memory_search
+    shared_blocks:
+      - shared_guidelines
+      - shared_archival_policies
+    memory_blocks:
+      - name: travel_preferences
+        description: "User travel style, budget preferences, and interests"
+        limit: 5000
+        from_file: "memory-blocks/travel/travel-preferences.md"
+
+      - name: trip_history
+        description: "Past trips and user feedback for better recommendations"
+        limit: 20000
+        from_file: "memory-blocks/travel/trip-history.md"
+
+      - name: destination_knowledge
+        description: "Detailed knowledge about destinations and travel tips"
+        limit: 5000
+        from_file: "memory-blocks/travel/destination-knowledge.md"
+
+      - name: user_profile
+        description: "Key details about the traveler's needs and preferences"
+        limit: 5000
+        from_file: "memory-blocks/travel/user-profile.md"
+        
+    folders:
+      - name: "travel_resources"
+        files:
+          - "files/*"  # Auto-discover all files in files directory
+          
+    embedding: "letta/letta-free"
