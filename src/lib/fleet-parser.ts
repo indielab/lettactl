@@ -181,7 +181,12 @@ export class FleetParser {
     }
   }
 
-  async registerRequiredTools(config: FleetConfig, client: any, verbose: boolean = false): Promise<Map<string, string>> {
+  async registerRequiredTools(
+    config: FleetConfig, 
+    client: any, 
+    verbose: boolean = false, 
+    toolSourceHashes: Record<string, string> = {}
+  ): Promise<Map<string, string>> {
     const toolNameToId = new Map<string, string>();
     
     // Get existing tools
@@ -213,10 +218,10 @@ export class FleetParser {
       
       // Check if tool already exists
       let tool = existingToolsArray.find((t: any) => t.name === toolName);
+      const toolPath = path.join(this.basePath, 'tools', `${toolName}.py`);
       
       if (!tool) {
-        // Try to register the tool
-        const toolPath = path.join(this.basePath, 'tools', `${toolName}.py`);
+        // Tool doesn't exist - register it
         if (fs.existsSync(toolPath)) {
           if (verbose) console.log(`Registering tool: ${toolName}`);
           try {
@@ -232,7 +237,25 @@ export class FleetParser {
           continue;
         }
       } else {
-        if (verbose) console.log(`Using existing tool: ${toolName}`);
+        // Tool exists - check if source code has changed
+        const currentSourceHash = toolSourceHashes[toolName];
+        if (currentSourceHash && fs.existsSync(toolPath)) {
+          // We have a hash for this tool, meaning source code is being tracked
+          // For comprehensive change detection, we would need to get the existing tool's 
+          // source code and compare hashes. For now, we'll re-register tools when
+          // their source exists and they're being tracked for changes.
+          if (verbose) console.log(`Re-registering tool due to potential source changes: ${toolName}`);
+          try {
+            const sourceCode = fs.readFileSync(toolPath, 'utf8');
+            tool = await client.createTool({ source_code: sourceCode });
+            if (verbose) console.log(`Tool ${toolName} re-registered`);
+          } catch (error: any) {
+            console.warn(`Failed to re-register tool ${toolName}: ${error.message}`);
+            // Continue with existing tool if re-registration fails
+          }
+        } else {
+          if (verbose) console.log(`Using existing tool: ${toolName}`);
+        }
       }
       
       toolNameToId.set(toolName, tool.id);

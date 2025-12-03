@@ -134,4 +134,128 @@ export class LettaClientWrapper {
   async compactMessages(agentId: string) {
     return await this.client.agents.messages.compact(agentId);
   }
+
+  // === Granular Agent Update Operations ===
+  // These methods enable partial updates that preserve conversation history
+
+  // Tool Management
+  async attachToolToAgent(agentId: string, toolId: string) {
+    return await this.client.agents.tools.attach(toolId, { agent_id: agentId });
+  }
+
+  async detachToolFromAgent(agentId: string, toolId: string) {
+    return await this.client.agents.tools.detach(toolId, { agent_id: agentId });
+  }
+
+  async listAgentTools(agentId: string) {
+    return await this.client.agents.tools.list(agentId);
+  }
+
+  async updateToolApproval(agentId: string, toolName: string, requiresApproval: boolean) {
+    return await this.client.agents.tools.updateApproval(toolName, { 
+      agent_id: agentId, 
+      body_requires_approval: requiresApproval 
+    });
+  }
+
+  // Memory Block Management
+  async attachBlockToAgent(agentId: string, blockId: string) {
+    return await this.client.agents.blocks.attach(blockId, { agent_id: agentId });
+  }
+
+  async detachBlockFromAgent(agentId: string, blockId: string) {
+    return await this.client.agents.blocks.detach(blockId, { agent_id: agentId });
+  }
+
+  async updateAgentBlock(agentId: string, blockLabel: string, updateData: any) {
+    return await this.client.agents.blocks.update(blockLabel, { 
+      agent_id: agentId, 
+      ...updateData 
+    });
+  }
+
+  async listAgentBlocks(agentId: string) {
+    return await this.client.agents.blocks.list(agentId);
+  }
+
+  // Folder Management
+  async detachFolderFromAgent(agentId: string, folderId: string) {
+    return await this.client.agents.folders.detach(folderId, { agent_id: agentId });
+  }
+
+  async listAgentFolders(agentId: string) {
+    return await this.client.agents.folders.list(agentId);
+  }
+
+  // Agent Configuration Updates (all preserve conversation history)
+  async updateAgentSystemPrompt(agentId: string, systemPrompt: string) {
+    return await this.updateAgent(agentId, { system: systemPrompt });
+  }
+
+  async updateAgentModel(agentId: string, model: string) {
+    return await this.updateAgent(agentId, { model });
+  }
+
+  async updateAgentEmbedding(agentId: string, embedding: string) {
+    return await this.updateAgent(agentId, { embedding });
+  }
+
+  async updateAgentContextWindow(agentId: string, contextWindowLimit: number) {
+    return await this.updateAgent(agentId, { context_window_limit: contextWindowLimit });
+  }
+
+  async updateAgentModelSettings(agentId: string, modelSettings: any) {
+    return await this.updateAgent(agentId, { model_settings: modelSettings });
+  }
+
+  async updateAgentMetadata(agentId: string, updates: {
+    name?: string;
+    description?: string;
+    timezone?: string;
+    tags?: string[];
+    metadata?: any;
+  }) {
+    return await this.updateAgent(agentId, updates);
+  }
+
+  // === File Management Operations ===
+  // These methods enable file add/remove/update operations in folders
+
+  async deleteFileFromFolder(folderId: string, fileId: string) {
+    return await this.client.folders.files.delete(fileId, { folder_id: folderId });
+  }
+
+  async getFileIdByName(folderId: string, fileName: string): Promise<string | null> {
+    const files = await this.listFolderFiles(folderId);
+    const fileList = Array.isArray(files) ? files : (files as any).items || [];
+    
+    for (const file of fileList) {
+      if (file.name === fileName || file.file_name === fileName) {
+        return file.id;
+      }
+    }
+    return null;
+  }
+
+  async uploadFileToExistingFolder(folderId: string, filePath: string, fileName: string, fileContent: Buffer | string) {
+    if (typeof fileContent === 'string') {
+      // Create a buffer from string content
+      const buffer = Buffer.from(fileContent, 'utf8');
+      // Create a readable stream from buffer
+      const { Readable } = require('stream');
+      const stream = new Readable();
+      stream.push(buffer);
+      stream.push(null);
+      
+      return await this.uploadFileToFolder(stream, folderId, fileName);
+    } else {
+      // Create stream from buffer
+      const { Readable } = require('stream');
+      const stream = new Readable();
+      stream.push(fileContent);
+      stream.push(null);
+      
+      return await this.uploadFileToFolder(stream, folderId, fileName);
+    }
+  }
 }

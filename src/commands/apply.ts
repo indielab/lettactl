@@ -2,8 +2,11 @@ import { FleetParser } from '../lib/fleet-parser';
 import { LettaClientWrapper } from '../lib/letta-client';
 import { BlockManager } from '../lib/block-manager';
 import { AgentManager } from '../lib/agent-manager';
+import { DiffEngine } from '../lib/diff-engine';
+import { FileContentTracker } from '../lib/file-content-tracker';
 import * as fs from 'fs';
 import * as path from 'path';
+
 
 export async function applyCommand(options: { file: string; agent?: string; dryRun?: boolean }, command: any) {
   const verbose = command.parent?.opts().verbose || false;
@@ -38,6 +41,8 @@ export async function applyCommand(options: { file: string; agent?: string; dryR
     const client = new LettaClientWrapper();
     const blockManager = new BlockManager(client);
     const agentManager = new AgentManager(client);
+    const diffEngine = new DiffEngine(client, blockManager, parser.basePath);
+    const fileTracker = new FileContentTracker(parser.basePath);
     const createdFolders = new Map<string, string>(); // folder name -> folder id
     
     // Load existing resources for versioning
@@ -57,9 +62,18 @@ export async function applyCommand(options: { file: string; agent?: string; dryR
       }
     }
     
+    // Generate tool source hashes for all tools in config
+    const allToolNames = new Set<string>();
+    for (const agent of config.agents) {
+      for (const toolName of agent.tools || []) {
+        allToolNames.add(toolName);
+      }
+    }
+    const globalToolSourceHashes = fileTracker.generateToolSourceHashes(Array.from(allToolNames));
+    
     // Register required tools
     if (verbose) console.log('Registering tools...');
-    const toolNameToId = await parser.registerRequiredTools(config, client, verbose);
+    const toolNameToId = await parser.registerRequiredTools(config, client, verbose, globalToolSourceHashes);
     
     // Create/get all folders with duplicate prevention
     if (verbose) console.log('Processing folders...');
@@ -136,15 +150,95 @@ export async function applyCommand(options: { file: string; agent?: string; dryR
       }
       
       try {
-        // Check if agent needs to be created based on system prompt changes
+        // Generate file content hashes for change detection
+        const folderContentHashes = fileTracker.generateFolderFileHashes(agent.folders || []);
+        
+        // Generate tool source code hashes for change detection  
+        const toolSourceHashes = fileTracker.generateToolSourceHashes(agent.tools || []);
+        
+        // Generate memory block file content hashes for change detection
+        const memoryBlockFileHashes = fileTracker.generateMemoryBlockFileHashes(agent.memory_blocks || []);
+        
+        // Check if agent needs to be created based on complete configuration
         const { agentName, shouldCreate, existingAgent } = await agentManager.getOrCreateAgentName(
           agent.name, 
-          agent.system_prompt.value || '', 
+          {
+            systemPrompt: agent.system_prompt.value || '',
+            tools: agent.tools || [],
+            toolSourceHashes,
+            model: agent.llm_config?.model,
+            embedding: agent.embedding,
+            contextWindow: agent.llm_config?.context_window,
+            memoryBlocks: (agent.memory_blocks || []).map(block => ({
+              name: block.name,
+              description: block.description,
+              limit: block.limit,
+              value: block.value || ''
+            })),
+            memoryBlockFileHashes,
+            folders: (agent.folders || []).map(folder => ({
+              name: folder.name,
+              files: folder.files,
+              fileContentHashes: folderContentHashes.get(folder.name) || {}
+            })),
+            sharedBlocks: agent.shared_blocks || []
+          },
           verbose
         );
 
         if (!shouldCreate && existingAgent) {
-          console.log(`Agent ${agent.name} already exists and is up to date`);
+          // Agent exists but may need partial updates  
+          const agentConfig = {
+            systemPrompt: agent.system_prompt.value || '',
+            tools: agent.tools || [],
+            toolSourceHashes,
+            model: agent.llm_config?.model,
+            embedding: agent.embedding,
+            contextWindow: agent.llm_config?.context_window,
+            memoryBlocks: (agent.memory_blocks || []).map(block => ({
+              name: block.name,
+              description: block.description,
+              limit: block.limit,
+              value: block.value || ''
+            })),
+            memoryBlockFileHashes,
+            folders: (agent.folders || []).map(folder => ({
+              name: folder.name,
+              files: folder.files,
+              fileContentHashes: folderContentHashes.get(folder.name) || {}
+            })),
+            sharedBlocks: agent.shared_blocks || []
+          };
+
+          // Check if any granular changes are needed
+          const changes = agentManager.getConfigChanges(existingAgent, agentConfig);
+          
+          if (!changes.hasChanges) {
+            console.log(`Agent ${agent.name} already exists and is up to date`);
+            continue;
+          }
+
+          // Apply partial updates to preserve conversation history
+          console.log(`Updating agent ${agent.name} (changed: ${changes.changedComponents.join(', ')})`);
+          
+          const updateOperations = await diffEngine.generateUpdateOperations(
+            existingAgent,
+            agentConfig,
+            toolNameToId,
+            createdFolders,
+            verbose
+          );
+
+          await diffEngine.applyUpdateOperations(
+            existingAgent.id,
+            updateOperations,
+            verbose
+          );
+
+          // Update registry with new hashes
+          agentManager.updateRegistry(existingAgent.name, agentConfig, existingAgent.id);
+          
+          console.log(`Agent ${agent.name} updated successfully (conversation history preserved)`);
           continue;
         }
 
@@ -200,7 +294,21 @@ export async function applyCommand(options: { file: string; agent?: string; dryR
         });
 
         // Update agent registry with new agent
-        agentManager.updateRegistry(agentName, agent.system_prompt.value || '', createdAgent.id);
+        agentManager.updateRegistry(agentName, {
+          systemPrompt: agent.system_prompt.value || '',
+          tools: agent.tools || [],
+          model: agent.llm_config?.model,
+          embedding: agent.embedding,
+          contextWindow: agent.llm_config?.context_window,
+          memoryBlocks: (agent.memory_blocks || []).map(block => ({
+            name: block.name,
+            description: block.description,
+            limit: block.limit,
+            value: block.value || ''
+          })),
+          folders: agent.folders || [],
+          sharedBlocks: agent.shared_blocks || []
+        }, createdAgent.id);
         
         // Attach folders to agent
         if (agent.folders) {

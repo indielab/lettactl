@@ -2,11 +2,21 @@ import { LettaClientWrapper } from './letta-client';
 import { normalizeResponse } from './response-normalizer';
 import * as crypto from 'crypto';
 
+export interface AgentConfigHashes {
+  overall: string;           // Combined hash for quick comparison
+  systemPrompt: string;      // System prompt hash
+  tools: string;             // Tools configuration hash
+  model: string;             // Model + embedding + context window hash
+  memoryBlocks: string;      // Memory blocks hash
+  folders: string;           // Folders hash
+  sharedBlocks: string;      // Shared blocks hash
+}
+
 export interface AgentVersion {
   id: string;
   name: string;
   baseName: string; // Name without version suffix
-  systemPromptHash: string;
+  configHashes: AgentConfigHashes;
   version: string;
   lastUpdated: string;
 }
@@ -25,6 +35,7 @@ export class AgentManager {
   private generateContentHash(content: string): string {
     return crypto.createHash('sha256').update(content).digest('hex').substring(0, 16);
   }
+
 
   /**
    * Generates a timestamp-based version for system prompt changes
@@ -49,6 +60,8 @@ export class AgentManager {
 
   /**
    * Loads existing agents from the server and builds the registry
+   * Note: We only store basic info here. Full configuration comparison 
+   * happens in getOrCreateAgentName when we have the desired config.
    */
   async loadExistingAgents(): Promise<void> {
     const agents = await this.client.listAgents();
@@ -56,14 +69,24 @@ export class AgentManager {
 
     for (const agent of agentList) {
       if (agent.name && agent.system) {
-        const systemPromptHash = this.generateContentHash(agent.system);
+        // For existing agents, store basic info for lookup
+        // Full configuration hashing will be done during comparison
+        const configHashes: AgentConfigHashes = {
+          overall: '',              // Will be populated during comparison
+          systemPrompt: this.generateContentHash(agent.system),
+          tools: '',
+          model: '', 
+          memoryBlocks: '',
+          folders: '',
+          sharedBlocks: ''
+        };
         const { baseName, version } = this.parseVersionFromName(agent.name);
 
         const agentVersion: AgentVersion = {
           id: agent.id,
           name: agent.name,
           baseName: baseName,
-          systemPromptHash: systemPromptHash,
+          configHashes: configHashes,
           version: version || 'latest',
           lastUpdated: agent.last_updated || new Date().toISOString()
         };
@@ -78,15 +101,105 @@ export class AgentManager {
   }
 
   /**
-   * Determines if an agent needs to be created/updated based on system prompt changes
+   * Generates granular configuration hashes for each component
+   */
+  private generateAgentConfigHashes(config: {
+    systemPrompt: string;
+    tools: string[];
+    toolSourceHashes?: Record<string, string>;
+    model?: string;
+    embedding?: string;
+    contextWindow?: number;
+    memoryBlocks?: Array<{name: string; description: string; limit: number; value: string}>;
+    memoryBlockFileHashes?: Record<string, string>;
+    folders?: Array<{name: string; files: string[]; fileContentHashes?: Record<string, string>}>;
+    sharedBlocks?: string[];
+  }): AgentConfigHashes {
+    
+    // System prompt hash
+    const systemPromptHash = this.generateContentHash(config.systemPrompt);
+    
+    // Tools hash - includes tool names and source code content when available
+    const toolsWithContent = (config.tools || []).map(toolName => ({
+      name: toolName,
+      sourceHash: config.toolSourceHashes?.[toolName] || ''
+    })).sort((a, b) => a.name.localeCompare(b.name));
+    const toolsHash = this.generateContentHash(JSON.stringify(toolsWithContent));
+    
+    // Model configuration hash (model + embedding + context window)
+    const modelConfig = {
+      model: config.model || "google_ai/gemini-2.5-pro",
+      embedding: config.embedding || "letta/letta-free",
+      contextWindow: config.contextWindow || 64000
+    };
+    const modelHash = this.generateContentHash(JSON.stringify(modelConfig));
+    
+    // Memory blocks hash - includes file content when available
+    const normalizedMemoryBlocks = (config.memoryBlocks || [])
+      .map(block => ({
+        name: block.name,
+        description: block.description,
+        limit: block.limit,
+        contentHash: config.memoryBlockFileHashes?.[block.name] || this.generateContentHash(block.value)
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const memoryBlocksHash = this.generateContentHash(JSON.stringify(normalizedMemoryBlocks));
+    
+    // Folders hash - includes file contents when available  
+    const normalizedFolders = (config.folders || [])
+      .map(folder => ({
+        name: folder.name,
+        files: [...folder.files].sort(),
+        fileContentHashes: folder.fileContentHashes || {}
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const foldersHash = this.generateContentHash(JSON.stringify(normalizedFolders));
+    
+    // Shared blocks hash
+    const sharedBlocksHash = this.generateContentHash(JSON.stringify([...(config.sharedBlocks || [])].sort()));
+    
+    // Overall hash combining all components
+    const overallHash = this.generateContentHash(JSON.stringify({
+      systemPrompt: systemPromptHash,
+      tools: toolsHash,
+      model: modelHash,
+      memoryBlocks: memoryBlocksHash,
+      folders: foldersHash,
+      sharedBlocks: sharedBlocksHash
+    }));
+    
+    return {
+      overall: overallHash,
+      systemPrompt: systemPromptHash,
+      tools: toolsHash,
+      model: modelHash,
+      memoryBlocks: memoryBlocksHash,
+      folders: foldersHash,
+      sharedBlocks: sharedBlocksHash
+    };
+  }
+
+  /**
+   * Determines if an agent needs to be created/updated based on complete configuration
    */
   async getOrCreateAgentName(
     baseName: string, 
-    systemPrompt: string, 
+    agentConfig: {
+      systemPrompt: string;
+      tools: string[];
+      toolSourceHashes?: Record<string, string>;
+      model?: string;
+      embedding?: string;
+      contextWindow?: number;
+      memoryBlocks?: Array<{name: string; description: string; limit: number; value: string}>;
+      memoryBlockFileHashes?: Record<string, string>;
+      folders?: Array<{name: string; files: string[]}>;
+      sharedBlocks?: string[];
+    },
     verbose: boolean = false
   ): Promise<{ agentName: string; shouldCreate: boolean; existingAgent?: AgentVersion }> {
     
-    const systemPromptHash = this.generateContentHash(systemPrompt);
+    const desiredConfigHashes = this.generateAgentConfigHashes(agentConfig);
     const existingAgent = this.agentRegistry.get(baseName);
 
     if (!existingAgent) {
@@ -98,42 +211,89 @@ export class AgentManager {
       };
     }
 
-    // Check if system prompt has changed
-    if (existingAgent.systemPromptHash === systemPromptHash) {
-      // System prompt unchanged, use existing agent
-      if (verbose) console.log(`  Using existing agent: ${existingAgent.name} (unchanged system prompt)`);
-      return { 
-        agentName: existingAgent.name, 
-        shouldCreate: false, 
-        existingAgent 
-      };
+    // For existing agents, we need to compare properly by generating current config hash
+    // from the server state. For now, we'll always prefer partial updates over recreation.
+    if (verbose) console.log(`  Found existing agent: ${existingAgent.name}, checking for changes...`);
+    
+    // Always return existing agent to trigger partial update logic in apply command
+    // The actual comparison will happen in the DiffEngine
+    return { 
+      agentName: existingAgent.name, 
+      shouldCreate: false, 
+      existingAgent 
+    };
+  }
+
+  /**
+   * Identifies what has changed between existing and desired agent configuration
+   */
+  getConfigChanges(existing: AgentVersion, newConfig: {
+    systemPrompt: string;
+    tools: string[];
+    toolSourceHashes?: Record<string, string>;
+    model?: string;
+    embedding?: string;
+    contextWindow?: number;
+    memoryBlocks?: Array<{name: string; description: string; limit: number; value: string}>;
+    memoryBlockFileHashes?: Record<string, string>;
+    folders?: Array<{name: string; files: string[]}>;
+    sharedBlocks?: string[];
+  }): {
+    hasChanges: boolean;
+    changedComponents: string[];
+    newHashes: AgentConfigHashes;
+  } {
+    const newHashes = this.generateAgentConfigHashes(newConfig);
+    const changedComponents: string[] = [];
+
+    // Compare each component hash
+    if (existing.configHashes.systemPrompt !== newHashes.systemPrompt) {
+      changedComponents.push('systemPrompt');
+    }
+    if (existing.configHashes.tools !== newHashes.tools) {
+      changedComponents.push('tools');
+    }
+    if (existing.configHashes.model !== newHashes.model) {
+      changedComponents.push('model');
+    }
+    if (existing.configHashes.memoryBlocks !== newHashes.memoryBlocks) {
+      changedComponents.push('memoryBlocks');
+    }
+    if (existing.configHashes.folders !== newHashes.folders) {
+      changedComponents.push('folders');
+    }
+    if (existing.configHashes.sharedBlocks !== newHashes.sharedBlocks) {
+      changedComponents.push('sharedBlocks');
     }
 
-    // System prompt changed, create new versioned agent
-    const newVersion = this.generateTimestampVersion(systemPromptHash);
-    const newAgentName = `${baseName}__v__${newVersion}`;
-    
-    if (verbose) console.log(`  System prompt changed for: ${baseName}`);
-    if (verbose) console.log(`  Creating new versioned agent: ${newAgentName}`);
-    
-    return { 
-      agentName: newAgentName, 
-      shouldCreate: true 
+    return {
+      hasChanges: changedComponents.length > 0,
+      changedComponents,
+      newHashes
     };
   }
 
   /**
    * Updates the registry after creating a new agent
    */
-  updateRegistry(agentName: string, systemPrompt: string, agentId: string): void {
-    const systemPromptHash = this.generateContentHash(systemPrompt);
+  updateRegistry(agentName: string, agentConfig: {
+    systemPrompt: string;
+    tools: string[];
+    model?: string;
+    embedding?: string;
+    contextWindow?: number;
+    memoryBlocks?: Array<{name: string; description: string; limit: number; value: string}>;
+    folders?: Array<{name: string; files: string[]}>;
+    sharedBlocks?: string[];
+  }, agentId: string): void {
+    const configHashes = this.generateAgentConfigHashes(agentConfig);
     const { baseName, version } = this.parseVersionFromName(agentName);
 
     const agentVersion: AgentVersion = {
       id: agentId,
       name: agentName,
       baseName: baseName,
-      systemPromptHash: systemPromptHash,
+      configHashes: configHashes,
       version: version || 'latest',
       lastUpdated: new Date().toISOString()
     };
