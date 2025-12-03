@@ -10,7 +10,8 @@ A kubectl-style CLI for managing stateful Letta AI agent fleets with declarative
 ## Features
 
 - 🚀 **Declarative Configuration** - Define agents in YAML, deploy with one command
-- 🔄 **Smart Versioning** - Automatic versioning when content changes
+- 🔄 **Smart Updates** - Only updates what actually changed, preserves conversation history
+- 🎯 **Intelligent Change Detection** - Automatically detects file content changes, tool updates, and memory block modifications
 - 🧠 **Fleet Management** - Deploy and manage multiple related agents together
 - 💬 **Message Operations** - Send messages, stream responses, manage conversations
 - 📦 **Resource Sharing** - Share memory blocks and tools across agents
@@ -339,6 +340,27 @@ folders:
 - `files/**/*` - Recursively discovers files in subdirectories
 - `tools/*` - Auto-discovers all Python tools in tools/ directory
 - No need to manually list every file!
+
+## Intelligent Updates
+
+lettactl only updates what actually changed and preserves conversation history:
+
+- **Edit tool source code** → Tools automatically re-registered
+- **Change memory block files** → Content updated seamlessly  
+- **Modify documents** → Files re-uploaded to folders
+- **Update config** → Agent settings changed
+- **No changes** → Nothing happens (fast!)
+
+```bash
+# Edit anything
+vim tools/my_tool.py
+vim memory-blocks/user-data.md
+vim agents.yml
+
+# Deploy - only changed parts update
+lettactl apply -f agents.yml
+# Conversation history preserved! 🎉
+```
 
 ## Core Features
 
