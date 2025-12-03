@@ -24,7 +24,10 @@ describe('AgentManager', () => {
     it('should create new agent when none exists', async () => {
       const result = await agentManager.getOrCreateAgentName(
         'test-agent',
-        'You are a test agent',
+        {
+          systemPrompt: 'You are a test agent',
+          tools: []
+        },
         false
       );
 
@@ -55,7 +58,10 @@ describe('AgentManager', () => {
 
       const result = await agentManager.getOrCreateAgentName(
         'test-agent',
-        'You are a test agent',
+        {
+          systemPrompt: 'You are a test agent',
+          tools: []
+        },
         false
       );
 
@@ -64,7 +70,7 @@ describe('AgentManager', () => {
       expect(result.existingAgent).toBeDefined();
     });
 
-    it('should create versioned agent when system prompt changes', async () => {
+    it('should return existing agent when system prompt changes (granular updates)', async () => {
       const mockAgents = [
         {
           id: 'agent-123',
@@ -86,13 +92,18 @@ describe('AgentManager', () => {
 
       const result = await agentManager.getOrCreateAgentName(
         'test-agent',
-        'You are an updated test agent',
+        {
+          systemPrompt: 'You are an updated test agent',
+          tools: []
+        },
         false
       );
 
-      expect(result.agentName).toMatch(/^test-agent__v__\d{8}-[a-f0-9]{8}$/);
-      expect(result.shouldCreate).toBe(true);
-      expect(result.existingAgent).toBeUndefined();
+      // With granular updates, we return existing agent for partial updates
+      expect(result.agentName).toBe('test-agent');
+      expect(result.shouldCreate).toBe(false);
+      expect(result.existingAgent).toBeDefined();
+      expect(result.existingAgent?.id).toBe('agent-123');
     });
 
     it('should handle versioned agent names', async () => {
@@ -117,7 +128,10 @@ describe('AgentManager', () => {
 
       const result = await agentManager.getOrCreateAgentName(
         'test-agent',
-        'You are a test agent',
+        {
+          systemPrompt: 'You are a test agent',
+          tools: []
+        },
         false
       );
 
@@ -130,7 +144,10 @@ describe('AgentManager', () => {
     it('should update registry with new agent', () => {
       agentManager.updateRegistry(
         'test-agent__v__20241202-def67890',
-        'You are a test agent',
+        {
+          systemPrompt: 'You are a test agent',
+          tools: []
+        },
         'agent-456'
       );
 
