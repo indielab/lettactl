@@ -1,0 +1,30 @@
+# Source files
+src/
+tests/
+*.test.ts
+*.spec.ts
+
+# Development files
+.env*
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+
+# Build artifacts
+tsconfig.json
+jest.config.js
+
+# Git files
+.git/
+.gitignore
+
+# Documentation (except README)
+docs/
+example/
+
+# Node modules and lockfiles
+node_modules/
+pnpm-lock.yaml
+yarn.lock
+package-lock.json

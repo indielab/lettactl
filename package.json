@@ -10,7 +10,12 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "test": "jest"
+    "test": "jest",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test && npm run build",
+    "preversion": "npm test",
+    "version": "npm run build && git add -A dist",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "letta",
@@ -21,6 +26,22 @@
   ],
   "author": "Nouamane Benbrahim & Letta",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nouamanecodes/lettactl.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nouamanecodes/lettactl/issues"
+  },
+  "homepage": "https://github.com/nouamanecodes/lettactl#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@letta-ai/letta-client": "^1.3.2",
     "chalk": "^5.6.2",

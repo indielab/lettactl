@@ -1,6 +1,6 @@
 # LettaCTL
 
-[![CI](https://github.com/letta-ai/lettactl/actions/workflows/ci.yml/badge.svg)](https://github.com/letta-ai/lettactl/actions)
+[![CI](https://github.com/nouamanecodes/lettactl/actions/workflows/ci.yml/badge.svg)](https://github.com/nouamanecodes/lettactl/actions)
 [![npm version](https://badge.fury.io/js/lettactl.svg)](https://badge.fury.io/js/lettactl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
@@ -21,58 +21,38 @@ A kubectl-style CLI for managing stateful Letta AI agent fleets with declarative
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js 22+ 
-- pnpm or npm
+- Node.js 18+ 
 - A running Letta server instance
 
-### Install and Build
+### Install
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd lettactl
-
-# Install dependencies
-pnpm install
-# or: npm install
-
-# Build the CLI
-pnpm build
-# or: npm run build
+# Install globally from npm
+npm install -g lettactl
 
 # Set up your environment
 export LETTA_API_URL=http://localhost:8283  # For self-hosting
 export LETTA_API_KEY=your_api_key           # Only needed for Letta Cloud
 ```
 
-### Running Commands
+### Usage
 
-Once built, you can run lettactl in several ways:
-
-```bash
-# Using npm/pnpm scripts (recommended for development):
-pnpm start -- get agents
-npm start -- get agents
-
-# Using the built binary directly:
-node dist/index.js get agents
-./dist/index.js get agents  # if executable
-
-# Development mode (with TypeScript):
-pnpm dev get agents
-npm run dev get agents
-```
-
-> **Note**: Once we finalize hosting and distribution details, we'll streamline the installation process. For now, these development commands work well for testing and evaluation.
-
-### Testing
-
-Run the comprehensive test suite:
+After installation, you can use lettactl directly:
 
 ```bash
-pnpm test
-# or: npm test
+# List all agents
+lettactl get agents
+
+# Deploy agents from configuration
+lettactl apply -f agents.yml
+
+# Send a message to an agent
+lettactl send my-agent "Hello, how are you?" --stream
+
+# View agent details
+lettactl describe agent my-agent
 ```
+
 
 ## Commands
 
@@ -214,16 +194,9 @@ lettactl delete-all agents --force                       # Delete ALL agents (da
 lettactl delete-all agents --pattern "test.*"            # Shows preview, asks for --force
 ```
 
-### Try the Complete Example
+### Quick Start Example
 
-The fastest way to get started is with our complete example:
-
-```bash
-cd example
-lettactl apply -f agents.yml
-```
-
-See the [example README](./example/README.md) for detailed documentation and best practices.
+The fastest way to get started is to create your own `agents.yml` file (see below) and deploy it:
 
 ### Your First Agent
 

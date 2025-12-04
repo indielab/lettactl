@@ -1,0 +1,110 @@
+# Shared blocks (optional, for reuse across agents)
+# Text fields support either inline "value:" or file reference "from_file:"
+shared_blocks:
+  - name: creative_director_persona
+    description: "Shared Creative Director identity for all Draper agents"
+    limit: 5000
+    from_file: "files/shared-creative-director-persona.md"
+
+  - name: archival_policies_shared
+    description: "Shared archival memory guidelines for all agents"
+    limit: 5000
+    from_file: "files/shared-archival-policies.md"
+
+# Each agent is completely self-contained
+agents:
+  - name: ada-content-strategist
+    description: "Content strategist for establishing AI authority with skeptical agency owners - UPDATED"
+    system_prompt:
+      from_file: "prompts/ada-system-prompt.md"
+    tools:
+      - archival_memory_insert
+      - archival_memory_search
+      - web_fetch
+      - nano_image_generate
+    memory_blocks:
+
+      - name: content_strategy_tracking
+        description: "Content performance and audience intelligence tracking"
+        limit: 10000
+        from_file: "memory-blocks/content-strategy-ada.md"
+
+      - name: voice_samples
+        description: "CEO's authentic voice patterns and communication style"
+        limit: 15000
+        from_file: "files/ada-writing-samples.md"
+
+      - name: content_examples
+        description: "Examples of effective content structure and practical guidance"
+        limit: 10000
+        from_file: "files/how-to-do-deep-research.md"
+
+      - name: human_ada
+        description: "Key details about working relationship and content preferences"
+        limit: 5000
+        from_file: "memory-blocks/human-ada.md"
+    folders:
+      - name: ada_strategy_docs
+        files:
+          - "files/ada-content-strategy.md"
+      - name: ada_profile_context
+        files:
+          - "files/nouamane-linkedin-profile.md"
+      - name: agency_owner_transcripts
+        files:
+          - "files/jason-swenk-big-brands-attention-kaitlyn-barclay.md"
+          - "files/jason-swenk-crm-for-agencies-steve-copper.md"
+          - "files/eric-huberman-hawke-media-ambition-strategy.md"
+          - "files/neil-patel-social-media-trends-2026.md"
+          - "files/neil-patel-seo-trends-2026-ai-revolution.md"
+    llm_config:
+      model: "google_ai/gemini-2.5-pro"
+      context_window: 32000
+    embedding: "letta/letta-free"
+
+  - name: draper-adspectre
+    description: "Creative Director for AdSpectre brand campaigns"
+    system_prompt:
+      from_file: "prompts/draper-system-prompt.md"
+    tools:
+      - nano_image_generate
+      - archival_memory_insert
+      - archival_memory_search
+    shared_blocks:
+      - creative_director_persona
+      - archival_policies_shared
+    memory_blocks:
+      - name: brand_identity_adspectre
+        description: "Core brand identity and messaging framework for AdSpectre"
+        limit: 5000
+        from_file: "memory-blocks/adspectre-brand-identity.md"
+
+      - name: creative_learnings_adspectre
+        description: "Feedback and learnings from creative work for AdSpectre"
+        limit: 20000
+        from_file: "memory-blocks/adspectre-creative-learnings.md"
+
+      - name: archival_tracking_adspectre
+        description: "Tracks archival memory search effectiveness for this brand"
+        limit: 5000
+        from_file: "memory-blocks/archival-tracking-adspectre.md"
+
+      - name: human_adspectre
+        description: "Key details about the person I'm conversing with"
+        limit: 5000
+        from_file: "memory-blocks/human-adspectre.md"
+    folders:
+      - name: creative_direction_docs
+        files:
+          - "files/on-brand-concept-development-guide.md"
+          - "files/clever-ads-generation-guide.md"
+          - "files/cinematic-scenes-generation-guide.md"
+          - "files/intimate-moments-generation-guide.md"
+          - "files/product-placement-generation-guide.md"
+      - name: ada_strategy_docs
+        files:
+          - "files/ada-content-strategy.md"
+    llm_config:
+      model: "google_ai/gemini-3-pro-preview"
+      context_window: 64000
+    embedding: "letta/letta-free"
