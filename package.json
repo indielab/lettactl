@@ -1,6 +1,6 @@
 {
   "name": "lettactl",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "kubectl-style CLI for managing Letta AI agent fleets",
   "main": "dist/index.js",
   "bin": {
@@ -14,7 +14,7 @@
     "prepare": "npm run build",
     "prepublishOnly": "npm test && npm run build",
     "preversion": "npm test",
-    "version": "npm run build && git add -A dist",
+    "version": "npm run build",
     "postversion": "git push && git push --tags"
   },
   "keywords": [
