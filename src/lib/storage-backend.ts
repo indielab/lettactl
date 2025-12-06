@@ -50,14 +50,51 @@ export class StorageBackendManager {
    * Convert bucket config to URI for backend routing
    */
   async readFromBucket(config: BucketConfig): Promise<string> {
+    // Validate bucket config structure
+    this.validateBucketConfig(config);
+    
     if (config.provider === 'supabase') {
       if (!this.supabaseBackend) {
         throw new Error('Supabase backend not configured');
       }
       return this.supabaseBackend.readFromBucket(config.bucket, config.path);
     }
+    // Check for common typos
+    const provider = String(config.provider).toLowerCase();
+    if (provider.includes('supab') || provider.includes('suapb')) {
+      throw new Error(`Provider '${config.provider}' not recognized. Did you mean 'supabase'?`);
+    }
+    
     // TODO: Add s3, gcs support
-    throw new Error(`Provider '${config.provider}' not yet supported. Coming soon: s3, gcs`);
+    throw new Error(`Provider '${config.provider}' not yet supported. Supported: supabase. Coming soon: s3, gcs`);
+  }
+  
+  private validateBucketConfig(config: any): void {
+    if (!config || typeof config !== 'object') {
+      throw new Error(
+        'Invalid from_bucket configuration. Expected object with provider, bucket, and path fields.\n' +
+        'Example:\n' +
+        'from_bucket:\n' +
+        '  provider: supabase\n' +
+        '  bucket: my-bucket\n' +
+        '  path: file.md'
+      );
+    }
+    
+    const requiredFields = ['provider', 'bucket', 'path'];
+    const missing = requiredFields.filter(field => !(field in config));
+    
+    if (missing.length > 0) {
+      throw new Error(
+        `Missing required fields in from_bucket config: ${missing.join(', ')}\n` +
+        'Required fields: provider, bucket, path\n' +
+        'Example:\n' +
+        'from_bucket:\n' +
+        '  provider: supabase\n' +
+        '  bucket: my-bucket\n' +
+        '  path: file.md'
+      );
+    }
   }
 }
 
