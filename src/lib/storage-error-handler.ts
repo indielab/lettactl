@@ -58,10 +58,15 @@ export class StorageErrorHandler {
         errorMessage += `: Rate limit exceeded. Please try again later.`;
         break;
       case 500:
-        errorMessage += `: Internal server error. Please try again or contact ${provider} support.`;
+      case 502:
+      case 503:
+      case 504:
+        errorMessage += `: ${provider} service outage or maintenance (HTTP ${status}). This is a server-side issue. Please try again in a few minutes or check ${provider} status page.`;
         break;
       default:
-        if (status) {
+        if (status >= 500 && status < 600) {
+          errorMessage += `: ${provider} server error (HTTP ${status}). Please try again or contact ${provider} support.`;
+        } else if (status) {
           errorMessage += `: HTTP ${status} error. Check ${provider} Storage configuration.`;
         } else {
           errorMessage += `: Unknown error. Check ${provider} Storage configuration and network connectivity.`;
