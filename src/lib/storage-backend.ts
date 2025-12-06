@@ -1,0 +1,167 @@
+/**
+ * Storage backend interface for lettactl
+ * Allows reading content from various sources (filesystem, cloud storage, etc.)
+ */
+
+export interface StorageBackend {
+  readContent(uri: string): Promise<string>
+  listFiles(pattern: string): Promise<string[]>
+  canHandle(uri: string): boolean
+}
+
+export interface BucketConfig {
+  provider: 'supabase'; // TODO: Add 's3' | 'gcs' support
+  bucket: string;
+  path: string;
+}
+
+/**
+ * Storage backend manager that routes requests to appropriate backends
+ */
+export class StorageBackendManager {
+  private backends: StorageBackend[] = [];
+  private supabaseBackend?: SupabaseStorageBackend;
+  
+  constructor(options: { supabaseBackend?: SupabaseStorageBackend } = {}) {
+    // Always include filesystem backend
+    this.backends.push(new FileSystemBackend());
+    
+    // Store Supabase backend separately since it has different interface
+    this.supabaseBackend = options.supabaseBackend;
+  }
+  
+  async readContent(uri: string): Promise<string> {
+    const backend = this.backends.find(b => b.canHandle(uri));
+    if (!backend) {
+      throw new Error(`No backend available for URI: ${uri}`);
+    }
+    return backend.readContent(uri);
+  }
+  
+  async listFiles(pattern: string): Promise<string[]> {
+    const backend = this.backends.find(b => b.canHandle(pattern));
+    if (!backend) {
+      throw new Error(`No backend available for pattern: ${pattern}`);
+    }
+    return backend.listFiles(pattern);
+  }
+  
+  /**
+   * Convert bucket config to URI for backend routing
+   */
+  async readFromBucket(config: BucketConfig): Promise<string> {
+    if (config.provider === 'supabase') {
+      if (!this.supabaseBackend) {
+        throw new Error('Supabase backend not configured');
+      }
+      return this.supabaseBackend.readFromBucket(config.bucket, config.path);
+    }
+    // TODO: Add s3, gcs support
+    throw new Error(`Provider '${config.provider}' not yet supported. Coming soon: s3, gcs`);
+  }
+}
+
+/**
+ * File system storage backend (existing behavior)
+ */
+import * as fs from 'fs'
+import * as path from 'path'
+import { globSync } from 'glob'
+
+export class FileSystemBackend implements StorageBackend {
+  constructor(private basePath: string = '') {}
+
+  canHandle(uri: string): boolean {
+    return !uri.includes('://') || uri.startsWith('file://')
+  }
+
+  async readContent(uri: string): Promise<string> {
+    const filePath = this.resolvePath(uri)
+    return fs.readFileSync(filePath, 'utf8')
+  }
+
+  async listFiles(pattern: string): Promise<string[]> {
+    const resolvedPattern = this.resolvePath(pattern)
+    return globSync(resolvedPattern)
+  }
+
+  private resolvePath(uri: string): string {
+    const cleanPath = uri.replace('file://', '')
+    if (path.isAbsolute(cleanPath)) return cleanPath
+    return path.resolve(this.basePath, cleanPath)
+  }
+}
+
+/**
+ * Supabase storage backend for cloud file access
+ */
+import { createClient } from '@supabase/supabase-js'
+import { StorageErrorHandler } from './storage-error-handler'
+
+export class SupabaseStorageBackend {
+  private supabase: any
+
+  constructor() {
+    // Use generic environment variables for standalone library
+    this.supabase = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!,
+      {
+        auth: { persistSession: false }
+      }
+    )
+  }
+
+  async readFromBucket(bucket: string, filePath: string): Promise<string> {
+    try {
+      const { data, error } = await this.supabase.storage
+        .from(bucket)
+        .download(filePath)
+      
+      if (error) {
+        StorageErrorHandler.handleProviderError(error, {
+          provider: 'supabase',
+          operation: 'download',
+          bucket,
+          filePath
+        });
+      }
+      
+      if (!data) {
+        throw new Error(`No data returned when downloading ${bucket}/${filePath}`);
+      }
+      
+      return await data.text()
+      
+    } catch (error: any) {
+      // Re-throw our custom errors, wrap unexpected ones
+      if (error.message.includes('Failed to download')) {
+        throw error;
+      }
+      
+      throw new Error(`Supabase storage error for ${bucket}/${filePath}: ${error.message || 'Unknown error'}`);
+    }
+  }
+
+  async listFiles(bucket: string, pathPrefix: string = ''): Promise<string[]> {
+    try {
+      const { data, error } = await this.supabase.storage
+        .from(bucket)
+        .list(pathPrefix, {
+          limit: 1000,
+          sortBy: { column: 'updated_at', order: 'desc' }
+        })
+      
+      if (error) {
+        throw new Error(`Failed to list files in ${bucket}/${pathPrefix}: ${error.message}`)
+      }
+      
+      return data?.map((file: any) => 
+        pathPrefix ? `${pathPrefix}/${file.name}` : file.name
+      ) || []
+      
+    } catch (error: any) {
+      throw new Error(`Supabase list error for ${bucket}/${pathPrefix}: ${error.message}`)
+    }
+  }
+}

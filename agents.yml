@@ -1,116 +1,51 @@
-# Shared blocks (optional, for reuse across agents)
-# Text fields support either inline "value:" or file reference "from_file:"
+# Example configuration showing filesystem and cloud storage options
+# See example/ directory for more complete examples
+
 shared_blocks:
-  - name: creative_director_persona
-    description: "Shared Creative Director identity for all Draper agents"
+  - name: shared_guidelines
+    description: "Shared guidelines for all agents"
     limit: 5000
-    from_file: "files/shared-creative-director-persona.md"
+    value: "These are shared guidelines that apply to all agents in this fleet."
 
-  - name: archival_policies_shared
-    description: "Shared archival memory guidelines for all agents"
-    limit: 5000
-    from_file: "files/shared-archival-policies.md"
-
-# Each agent is completely self-contained
 agents:
-  - name: ada-content-strategist
-    description: "Content strategist for establishing AI authority with skeptical agency owners - UPDATED"
+  - name: example-agent
+    description: "Example agent demonstrating lettactl features"
     system_prompt:
-      from_file: "prompts/ada-system-prompt.md"
+      value: "You are a helpful AI assistant."
     tools:
       - archival_memory_insert
       - archival_memory_search
-      - web_fetch
-      - nano_image_generate
     memory_blocks:
-
-      - name: content_strategy_tracking
-        description: "Content performance and audience intelligence tracking"
-        limit: 10000
-        from_file: "memory-blocks/content-strategy-ada.md"
-
-      - name: voice_samples
-        description: "CEO's authentic voice patterns and communication style"
-        limit: 15000
-        from_file: "files/ada-writing-samples.md"
-
-      - name: content_examples
-        description: "Examples of effective content structure and practical guidance"
-        limit: 10000
-        from_file: "files/how-to-do-deep-research.md"
-
-      - name: human_ada
-        description: "Key details about working relationship and content preferences"
+      - name: example_knowledge
+        description: "Example knowledge from local file"
         limit: 5000
-        from_file: "memory-blocks/human-ada.md"
-    folders:
-      - name: ada_strategy_docs
-        files:
-          - "files/ada-content-strategy.md"
-      - name: ada_profile_context
-        files:
-          - "files/nouamane-linkedin-profile.md"
-      - name: agency_owner_transcripts
-        files:
-          - "files/jason-swenk-big-brands-attention-kaitlyn-barclay.md"
-          - "files/jason-swenk-crm-for-agencies-steve-cooper.md"
-          - "files/eric-huberman-hawke-media-ambition-strategy.md"
-          - "files/neil-patel-social-media-trends-2026.md"
-          - "files/neil-patel-seo-trends-2026-ai-revolution.md"
-      - name: testing_intelligence
-        files:
-          - "files/visual-direction-proven-fixes.md"
-          - "files/customer-profiling-what-works.md"
-          - "files/brand-talent-pipeline-learnings.md"
-          - "files/meta-optimization-process.md"
+        from_file: "memory-blocks/example.md"
     llm_config:
       model: "google_ai/gemini-2.5-pro"
       context_window: 32000
     embedding: "letta/letta-free"
 
-  - name: draper-adspectre
-    description: "Creative Director for AdSpectre brand campaigns"
+  - name: cloud-agent
+    description: "Example agent using cloud storage"
     system_prompt:
-      from_file: "prompts/draper-system-prompt.md"
+      from_bucket:
+        provider: supabase
+        bucket: my-bucket
+        path: prompts/system-prompt.md
     tools:
-      - nano_image_generate
       - archival_memory_insert
       - archival_memory_search
     shared_blocks:
-      - creative_director_persona
-      - archival_policies_shared
+      - shared_guidelines
     memory_blocks:
-      - name: brand_identity_adspectre
-        description: "Core brand identity and messaging framework for AdSpectre"
+      - name: cloud_knowledge
+        description: "Knowledge from cloud storage"
         limit: 5000
-        from_file: "memory-blocks/adspectre-brand-identity.md"
-
-      - name: creative_learnings_adspectre
-        description: "Feedback and learnings from creative work for AdSpectre"
-        limit: 20000
-        from_file: "memory-blocks/adspectre-creative-learnings.md"
-
-      - name: archival_tracking_adspectre
-        description: "Tracks archival memory search effectiveness for this brand"
-        limit: 5000
-        from_file: "memory-blocks/archival-tracking-adspectre.md"
-
-      - name: human_adspectre
-        description: "Key details about the person I'm conversing with"
-        limit: 5000
-        from_file: "memory-blocks/human-adspectre.md"
-    folders:
-      - name: creative_direction_docs
-        files:
-          - "files/on-brand-concept-development-guide.md"
-          - "files/clever-ads-generation-guide.md"
-          - "files/cinematic-scenes-generation-guide.md"
-          - "files/intimate-moments-generation-guide.md"
-          - "files/product-placement-generation-guide.md"
-      - name: ada_strategy_docs
-        files:
-          - "files/ada-content-strategy.md"
+        from_bucket:
+          provider: supabase
+          bucket: my-bucket
+          path: knowledge/example.md
     llm_config:
-      model: "google_ai/gemini-3-pro-preview"
-      context_window: 64000
+      model: "google_ai/gemini-2.5-pro"
+      context_window: 32000
     embedding: "letta/letta-free"

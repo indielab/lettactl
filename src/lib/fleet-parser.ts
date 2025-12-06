@@ -2,12 +2,21 @@ import * as yaml from 'js-yaml';
 import * as fs from 'fs';
 import * as path from 'path';
 import { FleetConfig, FolderConfig } from '../types/fleet-config';
+import { StorageBackendManager, SupabaseStorageBackend, BucketConfig } from './storage-backend';
+
+export interface FleetParserOptions {
+  supabaseBackend?: SupabaseStorageBackend;
+}
 
 export class FleetParser {
   public basePath: string;
+  private storageManager: StorageBackendManager;
 
-  constructor(configPath: string) {
+  constructor(configPath: string, options: FleetParserOptions = {}) {
     this.basePath = path.dirname(configPath);
+    this.storageManager = new StorageBackendManager({ 
+      supabaseBackend: options.supabaseBackend 
+    });
   }
 
   async parseFleetConfig(configPath: string): Promise<FleetConfig> {
@@ -48,8 +57,13 @@ export class FleetParser {
 
   private async resolveBlockContent(block: any): Promise<void> {
     if (block.from_file) {
+      // Read from local filesystem
       const filePath = path.resolve(this.basePath, block.from_file);
       block.value = fs.readFileSync(filePath, 'utf8');
+    } else if (block.from_bucket) {
+      // Read from cloud bucket using new structure
+      const bucketConfig: BucketConfig = block.from_bucket;
+      block.value = await this.storageManager.readFromBucket(bucketConfig);
     } else if (!block.value) {
       // Smart default: look for memory-blocks/{name}.md
       const defaultPath = path.resolve(this.basePath, 'memory-blocks', `${block.name}.md`);
@@ -57,7 +71,7 @@ export class FleetParser {
         block.value = fs.readFileSync(defaultPath, 'utf8');
         console.log(`Auto-loaded memory block: ${block.name} from memory-blocks/${block.name}.md`);
       } else {
-        throw new Error(`Memory block '${block.name}' has no value or from_file specified, and default file memory-blocks/${block.name}.md not found`);
+        throw new Error(`Memory block '${block.name}' has no value, from_file, or from_bucket specified, and default file memory-blocks/${block.name}.md not found`);
       }
     }
   }
@@ -75,10 +89,14 @@ export class FleetParser {
     if (prompt.from_file) {
       const filePath = path.resolve(this.basePath, prompt.from_file);
       userPrompt = fs.readFileSync(filePath, 'utf8').trim();
+    } else if (prompt.from_bucket) {
+      // Read from cloud bucket using new structure
+      const bucketConfig: BucketConfig = prompt.from_bucket;
+      userPrompt = (await this.storageManager.readFromBucket(bucketConfig)).trim();
     } else if (prompt.value) {
       userPrompt = prompt.value.trim();
     } else {
-      throw new Error(`System prompt has no value or from_file specified`);
+      throw new Error(`System prompt has no value, from_file, or from_bucket specified`);
     }
     
     // Concatenate base instructions with user prompt

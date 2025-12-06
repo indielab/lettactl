@@ -6,6 +6,7 @@ import { DiffEngine } from '../lib/diff-engine';
 import { FileContentTracker } from '../lib/file-content-tracker';
 import { OutputFormatter } from '../lib/output-formatter';
 import { createSpinner, getSpinnerEnabled } from '../lib/spinner';
+import { SupabaseStorageBackend } from '../lib/storage-backend';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -23,7 +24,16 @@ export async function applyCommand(options: { file: string; agent?: string; dryR
       if (verbose) console.log(`Filtering agents by pattern: ${options.agent}`);
     }
 
-    const parser = new FleetParser(options.file);
+    // Initialize Supabase backend if environment variables are available
+    const supabaseBackend = process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY 
+      ? new SupabaseStorageBackend() 
+      : undefined;
+      
+    if (supabaseBackend) {
+      console.log('Supabase backend configured for cloud storage access');
+    }
+
+    const parser = new FleetParser(options.file, { supabaseBackend });
     const config = await parser.parseFleetConfig(options.file);
     
     if (verbose) console.log(`Found ${config.agents.length} agents in configuration`);

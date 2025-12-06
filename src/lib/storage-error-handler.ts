@@ -1,0 +1,164 @@
+/**
+ * Centralized error handling for storage backends
+ * Provides consistent error messages and handling across different cloud providers
+ */
+
+export interface StorageErrorContext {
+  provider: string;
+  operation: string;
+  bucket?: string;
+  filePath?: string;
+  pattern?: string;
+}
+
+export class StorageErrorHandler {
+  
+  /**
+   * Handle HTTP status-based errors with provider-specific context
+   */
+  static handleHttpError(
+    error: any, 
+    context: StorageErrorContext,
+    statusCode?: number
+  ): never {
+    const { provider, operation, bucket, filePath } = context;
+    const resource = bucket && filePath ? `${bucket}/${filePath}` : bucket || filePath || 'resource';
+    
+    let errorMessage = `Failed to ${operation} ${resource} (${provider})`;
+    
+    const status = statusCode || error.status || error.originalError?.status;
+    
+    switch (status) {
+      case 400:
+        if (provider.toLowerCase() === 'supabase') {
+          errorMessage += `: Bad request - this could be: 1) bucket '${bucket}' doesn't exist, 2) bucket is private (needs RLS policy or make it public), 3) invalid file path '${filePath}', or 4) malformed request. Check bucket exists, permissions, and path.`;
+        } else {
+          errorMessage += `: Bad request - this could be: 1) bucket '${bucket}' doesn't exist, 2) invalid file path '${filePath}', or 3) malformed request. Check bucket exists and path is correct.`;
+        }
+        break;
+      case 401:
+        errorMessage += `: Unauthorized. Please check your ${provider} credentials.`;
+        break;
+      case 403:
+        errorMessage += `: Access denied. Please check your ${provider} credentials and bucket permissions.`;
+        break;
+      case 404:
+        if (filePath) {
+          errorMessage += `: File not found. Please check that '${filePath}' exists in the '${bucket}' bucket.`;
+        } else {
+          errorMessage += `: Resource not found. Please check the bucket or path exists.`;
+        }
+        break;
+      case 429:
+        errorMessage += `: Rate limit exceeded. Please try again later.`;
+        break;
+      case 500:
+        errorMessage += `: Internal server error. Please try again or contact ${provider} support.`;
+        break;
+      default:
+        if (status) {
+          errorMessage += `: HTTP ${status} error. Check ${provider} Storage configuration.`;
+        } else {
+          errorMessage += `: Unknown error. Check ${provider} Storage configuration and network connectivity.`;
+        }
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  /**
+   * Handle provider-specific errors with fallback to generic handling
+   */
+  static handleProviderError(
+    error: any, 
+    context: StorageErrorContext
+  ): never {
+    const { provider } = context;
+    
+    switch (provider.toLowerCase()) {
+      case 'supabase':
+        return this.handleSupabaseError(error, context);
+      case 's3':
+        return this.handleS3Error(error, context);
+      case 'gcs':
+        return this.handleGCSError(error, context);
+      default:
+        return this.handleGenericError(error, context);
+    }
+  }
+  
+  /**
+   * Handle Supabase-specific error patterns
+   */
+  private static handleSupabaseError(error: any, context: StorageErrorContext): never {
+    // Handle Supabase StorageError with originalError
+    if (error.__isStorageError && error.originalError) {
+      return this.handleHttpError(error, context, error.originalError.status);
+    }
+    
+    // Handle direct Supabase error messages
+    if (error.message) {
+      if (error.message.includes('Object not found')) {
+        context.operation = 'download';
+        return this.handleHttpError(error, context, 404);
+      }
+      if (error.message.includes('Bucket not found')) {
+        return this.handleHttpError(error, context, 400);
+      }
+    }
+    
+    // Fallback to generic handling
+    return this.handleGenericError(error, context);
+  }
+  
+  /**
+   * Handle AWS S3-specific error patterns
+   * TODO: Implement when S3 backend is added
+   */
+  private static handleS3Error(error: any, context: StorageErrorContext): never {
+    // S3-specific error handling will go here
+    // e.g., NoSuchBucket, NoSuchKey, AccessDenied, etc.
+    return this.handleGenericError(error, context);
+  }
+  
+  /**
+   * Handle Google Cloud Storage-specific error patterns  
+   * TODO: Implement when GCS backend is added
+   */
+  private static handleGCSError(error: any, context: StorageErrorContext): never {
+    // GCS-specific error handling will go here
+    return this.handleGenericError(error, context);
+  }
+  
+  /**
+   * Generic error handling for unknown or unexpected errors
+   */
+  private static handleGenericError(error: any, context: StorageErrorContext): never {
+    const { provider, operation, bucket, filePath } = context;
+    const resource = bucket && filePath ? `${bucket}/${filePath}` : bucket || filePath || 'resource';
+    
+    let errorMessage = `${provider} storage error while trying to ${operation} ${resource}`;
+    
+    if (error.message) {
+      errorMessage += `: ${error.message}`;
+    } else {
+      errorMessage += `: ${JSON.stringify(error)}`;
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  /**
+   * Wrap async storage operations with consistent error handling
+   */
+  static async wrapStorageOperation<T>(
+    operation: () => Promise<T>,
+    context: StorageErrorContext
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error: any) {
+      this.handleProviderError(error, context);
+    }
+  }
+}
