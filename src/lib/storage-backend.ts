@@ -211,6 +211,27 @@ export class SupabaseStorageBackend {
 
   async readFromBucket(bucket: string, filePath: string): Promise<string> {
     try {
+      // Check file metadata first to detect empty files efficiently
+      const pathParts = filePath.split('/');
+      const fileName = pathParts.pop();
+      const folder = pathParts.join('/') || '';
+      
+      const { data: listData, error: listError } = await this.supabase.storage
+        .from(bucket)
+        .list(folder, { 
+          search: fileName,
+          limit: 1 
+        });
+      
+      if (!listError && listData) {
+        const fileInfo = listData.find((f: any) => f.name === fileName);
+        if (fileInfo && fileInfo.metadata?.size <= 40) {
+          console.warn(
+            `Warning: File '${filePath}' in bucket '${bucket}' is very small (${fileInfo.metadata?.size || 'unknown'} bytes). Check file has meaningful content.`
+          );
+        }
+      }
+      
       const { data, error } = await this.supabase.storage
         .from(bucket)
         .download(filePath)
