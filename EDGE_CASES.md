@@ -10,7 +10,7 @@
 
 ## File & Bucket Edge Cases
 7. ✅ Bucket doesn't exist - typo in bucket name, bucket deleted
-8. File doesn't exist - wrong path, file deleted after YAML created
+8. ✅ File doesn't exist - wrong path, file deleted after YAML created
 9. Empty file - file exists but has no content
 10. Very large files - exceeding memory limits, download timeouts
 11. Binary files - PDFs, images when we expect text

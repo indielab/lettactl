@@ -35,7 +35,7 @@ export class StorageErrorHandler {
           if (error.message && (error.message.includes('bucket') || error.message.includes('not found'))) {
             errorMessage += `: Bucket '${bucket}' not found. Check: 1) bucket name is spelled correctly, 2) bucket exists in your Supabase project, 3) you're connected to the right project.`;
           } else {
-            errorMessage += `: Bad request - this could be: 1) bucket '${bucket}' doesn't exist, 2) bucket is private (needs RLS policy or make bucket public), 3) wrong RLS policy configuration, 4) invalid file path '${filePath}', 5) malformed request, or 6) something else (Supabase error messages aren't clear here). Check: bucket exists, is public or has proper RLS, and file path is correct.`;
+            errorMessage += `: Bad request - this could be: 1) bucket '${bucket}' doesn't exist, 2) file '${filePath}' doesn't exist, 3) bucket is private (needs RLS policy or make bucket public), 4) wrong RLS policy configuration, 5) invalid file path '${filePath}', 6) malformed request, or 7) something else (Supabase error messages aren't clear here). Check: bucket exists, file exists, is public or has proper RLS, and file path is correct.`;
           }
         } else {
           errorMessage += `: Bad request - this could be: 1) bucket '${bucket}' doesn't exist, 2) invalid file path '${filePath}', or 3) malformed request. Check bucket exists and path is correct.`;
