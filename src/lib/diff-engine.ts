@@ -65,6 +65,13 @@ export class DiffEngine {
   }
 
   /**
+   * Helper method to check if an item has file-based content that might have changed
+   */
+  private hasFileBasedContent(itemName: string, fileHashes: Record<string, string>): boolean {
+    return !!fileHashes[itemName];
+  }
+
+  /**
    * Analyzes differences between existing and desired agent configuration
    * and generates specific update operations that preserve conversation history
    */
@@ -78,6 +85,7 @@ export class DiffEngine {
       embedding?: string;
       contextWindow?: number;
       memoryBlocks?: Array<{name: string; description: string; limit: number; value: string}>;
+      memoryBlockFileHashes?: Record<string, string>;
       folders?: Array<{name: string; files: string[]}>;
       sharedBlocks?: string[];
     },
@@ -157,7 +165,8 @@ export class DiffEngine {
       [
         ...(desiredConfig.memoryBlocks || []),
         ...(desiredConfig.sharedBlocks || []).map(name => ({ name, isShared: true }))
-      ]
+      ],
+      desiredConfig.memoryBlockFileHashes || {}
     );
     operations.operationCount += operations.blocks.toAdd.length + operations.blocks.toRemove.length + operations.blocks.toUpdate.length;
 
@@ -203,11 +212,11 @@ export class DiffEngine {
         // Tool exists in both current and desired
         const toolName = tool.name;
         
-        // Check if source code has changed for custom tools
-        if (toolSourceHashes[toolName] && !['archival_memory_insert', 'archival_memory_search'].includes(toolName)) {
-          // For tools with source code, we need to check if the source has changed
-          // This would require getting the current tool's source hash and comparing
-          // For now, we'll re-register tools when their source files exist and have hashes
+        // Check if source code has changed for custom tools using the same pattern
+        if (this.hasFileBasedContent(toolName, toolSourceHashes) && !['archival_memory_insert', 'archival_memory_search'].includes(toolName)) {
+          // This tool has file-based source code, assume it might have changed and mark for update
+          console.log(`Tool ${toolName} has file-based content, checking for updates...`);
+          
           const currentToolId = tool.id;
           const newToolId = toolRegistry.get(toolName);
           
@@ -220,7 +229,13 @@ export class DiffEngine {
               reason: 'source_code_changed' 
             });
           } else {
-            unchanged.push({ name: tool.name, id: tool.id });
+            // Tool ID is same but source might have changed, still mark as update needed
+            toUpdate.push({ 
+              name: toolName, 
+              currentId: currentToolId, 
+              newId: currentToolId, 
+              reason: 'source_content_changed' 
+            });
           }
         } else {
           unchanged.push({ name: tool.name, id: tool.id });
@@ -236,8 +251,13 @@ export class DiffEngine {
 
   private async analyzeBlockChanges(
     currentBlocks: any[],
-    desiredBlocks: Array<{ name: string; isShared?: boolean }>
+    desiredBlocks: Array<{ name: string; isShared?: boolean }>,
+    memoryBlockFileHashes: Record<string, string> = {}
   ): Promise<BlockDiff> {
+    console.log(`DEBUG DIFF - memoryBlockFileHashes:`, memoryBlockFileHashes);
+    console.log(`DEBUG DIFF - currentBlocks:`, currentBlocks.map(b => ({ label: b.label, id: b.id })));
+    console.log(`DEBUG DIFF - desiredBlocks:`, desiredBlocks.map(b => ({ name: b.name, isShared: b.isShared })));
+    
     const currentBlockNames = new Set(currentBlocks.map(b => b.label));
     const desiredBlockNames = new Set(desiredBlocks.map(b => b.name));
 
@@ -251,7 +271,9 @@ export class DiffEngine {
       if (!currentBlockNames.has(blockConfig.name)) {
         const blockId = blockConfig.isShared 
           ? this.blockManager.getSharedBlockId(blockConfig.name)
-          : this.blockManager.getSharedBlockId(blockConfig.name); // TODO: Add agent block lookup
+          : this.blockManager.getAgentBlockId(blockConfig.name);
+        
+        console.log(`DEBUG DIFF - Looking for block '${blockConfig.name}', isShared: ${blockConfig.isShared}, found ID: ${blockId}`);
         
         if (blockId) {
           toAdd.push({ name: blockConfig.name, id: blockId });
@@ -259,10 +281,28 @@ export class DiffEngine {
       }
     }
 
-    // Find blocks to remove and unchanged
+    // Find blocks to remove, update (content changed), or unchanged
     for (const block of currentBlocks) {
       if (desiredBlockNames.has(block.label)) {
-        unchanged.push({ name: block.label, id: block.id });
+        // Block exists in both current and desired
+        const blockName = block.label;
+        
+        // Check if content has changed by comparing with file hash
+        if (this.hasFileBasedContent(blockName, memoryBlockFileHashes)) {
+          // This block has file-based content, assume it might have changed and mark for update
+          console.log(`Block ${blockName} has file-based content, checking for updates...`);
+          
+          // Create new block with updated content and mark for update
+          const newBlockId = this.blockManager.getSharedBlockId(blockName); // Get updated block ID
+          if (newBlockId && newBlockId !== block.id) {
+            toUpdate.push({ name: blockName, currentId: block.id, newId: newBlockId });
+          } else {
+            // Content may have changed but block ID is same, still mark as update needed
+            toUpdate.push({ name: blockName, currentId: block.id, newId: block.id });
+          }
+        } else {
+          unchanged.push({ name: block.label, id: block.id });
+        }
       } else {
         toRemove.push({ name: block.label, id: block.id });
       }
@@ -324,9 +364,9 @@ export class DiffEngine {
               if (!currentFileNames.has(fileName)) {
                 filesToAdd.push(filePath);
               } else {
-                // File exists, check if content changed
-                // For now, assume content may have changed if folder hash changed
-                if (desiredFolder.fileContentHashes && desiredFolder.fileContentHashes[filePath]) {
+                // File exists, check if content changed using the same pattern as memory blocks
+                if (this.hasFileBasedContent(filePath, desiredFolder.fileContentHashes || {})) {
+                  console.log(`File ${filePath} has file-based content, checking for updates...`);
                   filesToUpdate.push(filePath);
                 }
               }

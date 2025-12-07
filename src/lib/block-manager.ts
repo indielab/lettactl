@@ -289,6 +289,15 @@ export class BlockManager {
   }
 
   /**
+   * Gets agent block ID by name if it exists
+   */
+  getAgentBlockId(blockName: string): string | null {
+    const blockKey = this.getBlockKey(blockName, false);
+    const existing = this.blockRegistry.get(blockKey);
+    return existing ? existing.id : null;
+  }
+
+  /**
    * Lists all block versions for debugging/reporting
    */
   getBlockRegistry(): Map<string, BlockVersion> {
