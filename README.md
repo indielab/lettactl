@@ -7,6 +7,15 @@
 
 A kubectl-style CLI for managing stateful Letta AI agent fleets with declarative configuration. Think "Docker Compose" but for AI agents - define your entire agent setup in YAML and deploy with one command.
 
+## Two Ways to Use LettaCtl
+
+| **CLI Tool** | **Programmatic SDK** |
+|--------------|---------------------|
+| Command-line interface | Library for applications |
+| Automated fleet management | Dynamic agent creation |
+| `npm install -g lettactl` | `npm install lettactl` |
+| Perfect for DevOps workflows | Perfect for SaaS platforms |
+
 ## Features
 
 - 🚀 **Declarative Configuration** - Define agents in YAML, deploy with one command
@@ -17,14 +26,20 @@ A kubectl-style CLI for managing stateful Letta AI agent fleets with declarative
 - 📦 **Resource Sharing** - Share memory blocks and tools across agents
 - 🗑️ **Bulk Operations** - Pattern-based bulk delete with safety previews and shared resource preservation
 - 🔧 **Tool And Documentation Discovery** - Auto-discover custom Python tools & all documents to be pushed to letta folders
+- 🛠️ **Programmatic SDK** - Use as a library for building multi-tenant applications
+- ☁️ **Cloud Storage** - Supabase integration for fleet configurations and content
 
-## Installation & Setup
-
-### Prerequisites
+## Prerequisites
 - Node.js 18+ 
 - A running Letta server instance
 
-### Install
+---
+
+# CLI Usage
+
+For DevOps workflows
+
+## Installation
 
 ```bash
 # Install globally from npm
@@ -35,24 +50,66 @@ export LETTA_API_URL=http://localhost:8283  # For self-hosting
 export LETTA_API_KEY=your_api_key           # Only needed for Letta Cloud
 ```
 
-### Usage
+### Your First Fleet
 
-After installation, you can use lettactl directly:
+Create a file called `agents.yml`
 
-```bash
-# List all agents
-lettactl get agents
+```yaml
+# Fleet configuration demonstrating lettactl's capabilities
+# Two different agent types showing various features
 
-# Deploy agents from configuration
-lettactl apply -f agents.yml
+shared_blocks:  # Memory blocks shared across agents
+  - name: shared_guidelines
+    description: "Shared operational guidelines for all agents"
+    limit: 5000
+    from_file: "memory-blocks/shared-guidelines.md"  # Load from file
 
-# Send a message to an agent
-lettactl send my-agent "Hello, how are you?" --stream
+agents:
+  # 1. Simple agent with files only
+  - name: document-assistant
+    description: "AI assistant for document analysis and processing"
+    llm_config:  # Required LLM settings
+      model: "google_ai/gemini-2.5-pro"
+      context_window: 32000
+    system_prompt:
+      value: "You are a document assistant. Help users analyze, summarize, and understand documents."
+    folders:  # Files attached to agent
+      - name: documents
+        files:
+          - "files/*"  # Auto-discover all files in files/
+    embedding: "letta/letta-free"
 
-# View agent details
-lettactl describe agent my-agent
+  # 2. Cloud-powered agent using Supabase storage  
+  - name: cloud-assistant
+    description: "AI assistant powered by cloud storage"
+    llm_config:
+      model: "google_ai/gemini-2.5-pro" 
+      context_window: 32000
+    system_prompt:
+      from_bucket:  # Load prompt from cloud storage
+        provider: supabase
+        bucket: test-bucket
+        path: prompts/system-prompt.md
+    shared_blocks:  # Use shared memory blocks
+      - shared_guidelines
+    memory_blocks:  # Agent-specific memory
+      - name: cloud_knowledge
+        description: "Knowledge base from cloud storage"
+        limit: 8000
+        from_bucket:  # Load content from cloud storage
+          provider: supabase
+          bucket: test-bucket
+          path: knowledge/example.md
+    embedding: "letta/letta-free"
 ```
 
+Deploy the entire fleet:
+
+```bash
+lettactl apply -f agents.yml  # Deploy all agents and shared resources
+```
+
+That's it! Your entire fleet is now running with shared resources and cloud storage.
 
 ## Commands
 
@@ -194,41 +251,172 @@ lettactl delete-all agents --force                       # Delete ALL agents (da
 lettactl delete-all agents --pattern "test.*"            # Shows preview, asks for --force
 ```
 
-### Quick Start Example
+---
 
-The fastest way to get started is to create your own `agents.yml` file (see below) and deploy it:
+# SDK Usage
 
-### Your First Agent
+For building applications with dynamic agent creation.
 
-Create a file called `agents.yml`:
-
-```yaml
-agents:
-  - name: my-first-agent
-    description: "A helpful AI assistant"
-    llm_config:
-      model: "google_ai/gemini-2.5-pro"
-      context_window: 32000
-    system_prompt:
-      value: "You are a helpful AI assistant."
-    tools:
-      - archival_memory_insert
-      - archival_memory_search
-    memory_blocks:
-      - name: user_preferences
-        description: "Remembers what the user likes"
-        limit: 2000
-        value: "User prefers concise, direct answers."
-    embedding: "letta/letta-free"
-```
-
-Deploy it:
+## Installation
 
 ```bash
-lettactl apply -f agents.yml
+# Install locally for programmatic usage (choose your flavor)
+npm install lettactl
+
+# Or
+yarn install lettactl 
+
+# Or
+pnpm install lettactl
 ```
 
-That's it! Your agent is now running.
+## Three Usage Patterns
+
+### 1. Dynamic YAML Generation
+Write YAML configuration as strings and deploy directly:
+
+```typescript
+import { LettaCtl } from 'lettactl';
+
+const lettactl = new LettaCtl({
+  lettaApiUrl: 'http://localhost:8283'
+});
+
+const userId = 'acme-corp';
+
+// Write YAML configuration as a string with dynamic values
+const yamlConfig = `
+shared_blocks:  # Memory blocks shared across agents
+  - name: shared-guidelines
+    description: "Shared operational guidelines for all agents"
+    limit: 5000
+    value: "Common guidelines for all user agents."
+
+agents:
+  - name: user-${userId}-assistant  # Dynamic user ID
+    description: "AI assistant for user ${userId}"
+    llm_config:  # Required LLM settings
+      model: "google_ai/gemini-2.5-pro"
+      context_window: 32000
+    system_prompt:  # How the agent behaves
+      value: "You are an assistant for user ${userId}."
+    shared_blocks:  # Use shared memory blocks
+      - shared-guidelines
+    embedding: "letta/letta-free"
+`;
+
+// Deploy directly from YAML string (no file I/O needed)
+await lettactl.deployFromYamlString(yamlConfig);
+```
+
+### 2. Existing YAML Deployment
+Deploy existing YAML files programmatically:
+
+```typescript
+// Deploy existing configs
+await lettactl.deployFromYaml('./configs/production.yaml');
+
+// With filtering
+await lettactl.deployFromYaml('./configs/all-agents.yaml', {
+  agentPattern: 'user-123',  // Only deploy matching agents
+  dryRun: true               // Preview changes
+});
+```
+
+### 3. Direct Deployment
+Build and deploy fleet configurations directly in memory:
+
+```typescript
+// Build a fleet with shared resources and multiple agent types
+const fleet = lettactl.createFleetConfig()
+  .addSharedBlock({  // Shared memory across agents
+    name: 'shared-guidelines',
+    description: 'Shared operational guidelines',
+    limit: 5000,
+    value: 'Common guidelines for all user agents.'
+  })
+  .addAgent({  // Simple document-focused agent
+    name: 'user-123-document-assistant',
+    description: 'Document assistant for user 123',
+    llm_config: { model: 'google_ai/gemini-2.5-pro', context_window: 32000 },
+    system_prompt: { value: 'You analyze documents for user 123.' },
+    folders: [{ name: 'documents', files: ['files/*'] }]  // Auto-discover files
+  })
+  .addAgent({  // Cloud-powered agent with shared memory
+    name: 'user-123-cloud-assistant', 
+    description: 'Cloud assistant for user 123',
+    llm_config: { model: 'google_ai/gemini-2.5-pro', context_window: 32000 },
+    system_prompt: { value: 'You are a cloud-powered assistant for user 123.' },
+    shared_blocks: ['shared-guidelines'],  // Use shared memory
+    memory_blocks: [{
+      name: 'user-knowledge',
+      description: 'User-specific knowledge base',
+      limit: 8000,
+      value: 'User 123 knowledge and preferences.'
+    }]
+  })
+  .build();
+
+await lettactl.deployFleet(fleet);  // Deploy entire fleet
+```
+
+## Multi-Tenant SaaS Example
+
+Create agents dynamically for different users:
+
+```typescript
+const lettactl = new LettaCtl();
+
+// Single user onboarding
+const userId = 'acme-corp';
+const companyInfo = 'Acme Corp is a B2B software company specializing in CRM solutions.';
+
+const fleet = lettactl.createFleetConfig()
+  .addAgent({
+    name: `${userId}-assistant`,
+    description: `AI assistant for ${userId}`,
+    llm_config: { model: 'google_ai/gemini-2.5-pro', context_window: 32000 },
+    system_prompt: { value: `You are an AI assistant for ${userId}. Help with tasks and answer questions.` },
+    memory_blocks: [{
+      name: 'company-info',
+      description: 'User company information',
+      limit: 8000,
+      value: companyInfo
+    }]
+  })
+  .build();
+
+await lettactl.deployFleet(fleet);
+
+// Batch user onboarding
+const users = [
+  { id: 'startup-1', info: 'Tech startup focused on AI tools' },
+  { id: 'enterprise-2', info: 'Large enterprise with complex workflows' },
+  { id: 'agency-3', info: 'Marketing agency serving B2B users' }
+];
+
+const batchFleet = lettactl.createFleetConfig();
+for (const user of users) {
+  batchFleet.addAgent({
+    name: `${user.id}-assistant`,
+    description: `AI assistant for ${user.id}`,
+    llm_config: { model: 'google_ai/gemini-2.5-pro', context_window: 32000 },
+    system_prompt: { value: `You are an AI assistant for ${user.id}.` },
+    memory_blocks: [{ 
+      name: 'company-info', 
+      description: 'Company information', 
+      limit: 8000, 
+      value: user.info 
+    }]
+  });
+}
+
+await lettactl.deployFleet(batchFleet.build());
+```
+
+---
+
+# Configuration Reference
 
 ## Essential Configuration
 
@@ -335,86 +523,6 @@ lettactl apply -f agents.yml
 # Conversation history preserved! 🎉
 ```
 
-## Core Features
-
-### Smart Versioning
-
-lettactl automatically handles versioning when content changes:
-
-```yaml
-memory_blocks:
-  - name: user_data
-    description: "User information"
-    value: "Updated content here"
-    # lettactl creates: user_data__v__20241202-a1b2c3d4
-```
-
-**User-defined versions:**
-```yaml
-memory_blocks:
-  - name: campaign_brief
-    version: "summer-2024-launch"  # Your custom tag
-    value: "Summer campaign details..."
-    # Creates: campaign_brief__v__summer-2024-launch
-```
-
-### Diff-Based Updates
-
-When you change system prompts or memory content, lettactl creates new versioned agents instead of overwriting existing ones:
-
-```bash
-# First apply creates: recipe-assistant
-lettactl apply -f agents.yml
-
-# After changing system prompt, creates: recipe-assistant__v__20241202-abc123
-lettactl apply -f agents.yml
-
-# Unchanged agents are left alone
-```
-
-### Shared Resources
-
-Share memory blocks across multiple agents:
-
-```yaml
-shared_blocks:
-  - name: company_guidelines
-    description: "Company-wide AI guidelines"
-    limit: 5000
-    from_file: "shared/guidelines.md"
-
-agents:
-  - name: sales-agent
-    shared_blocks:
-      - company_guidelines
-    # ... rest of config
-    
-  - name: support-agent  
-    shared_blocks:
-      - company_guidelines
-    # ... rest of config
-```
-
-### Custom Tools
-
-Auto-discover Python tools:
-
-```yaml
-tools:
-  - tools/*                    # Auto-discover all .py files
-  - specific_tool_name         # Or reference specific tools
-```
-
-Create `tools/my_tool.py`:
-```python
-from pydantic import BaseModel
-
-def my_custom_tool(query: str) -> str:
-    """Does something amazing with the query"""
-    return f"Processed: {query}"
-```
-
-
 ## Complete Configuration Reference
 
 ### Agent Schema
@@ -499,16 +607,6 @@ your-project/
     ├── tool1.py
     └── tool2.py
 ```
-
-## Why lettactl?
-
-Managing AI agents manually gets messy fast. You end up with:
-- Inconsistent configurations across environments
-- Lost work when recreating agents  
-- No version control for agent setups
-- Painful collaboration between team members
-
-lettactl treats your AI agents like infrastructure - versionable, reproducible, and manageable at scale.
 
 ## Advanced Features
 
@@ -601,14 +699,6 @@ lettactl get agents
 ```
 
 ## Implementation Notes
-
-### File Processing
-
-lettactl uses efficient metadata checking for cloud storage files:
-- Reads file metadata (size, etc.) before downloading to detect issues early
-- Warns about very small files (≤40 bytes) that may be effectively empty
-- Warns about very large files (>50MB) that may cause memory or timeout issues  
-- Only downloads file content when metadata checks pass
 
 ### Stateless Design
 
