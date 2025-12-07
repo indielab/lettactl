@@ -44,6 +44,7 @@
   ],
   "dependencies": {
     "@letta-ai/letta-client": "^1.3.2",
+    "@supabase/supabase-js": "^2.86.2",
     "chalk": "^5.6.2",
     "cli-table3": "^0.6.5",
     "commander": "^14.0.2",
