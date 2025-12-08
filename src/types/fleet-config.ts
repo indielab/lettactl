@@ -17,7 +17,7 @@ export interface AgentConfig {
   description: string;
   system_prompt: PromptConfig;
   llm_config: LLMConfig;
-  tools?: (string | ToolConfig)[];
+  tools?: string[];
   shared_blocks?: string[];
   memory_blocks?: MemoryBlock[];
   folders?: FolderConfig[];

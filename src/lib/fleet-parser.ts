@@ -12,6 +12,7 @@ export interface FleetParserOptions {
 export class FleetParser {
   public basePath: string;
   private storageManager: StorageBackendManager;
+  private toolConfigs: Map<string, any> = new Map();
 
   constructor(configPath: string, options: FleetParserOptions = {}) {
     this.basePath = path.dirname(configPath);
@@ -187,10 +188,11 @@ export class FleetParser {
 
     for (const agent of config.agents) {
       if (agent.tools) {
-        // Only auto-expand when explicitly specified in config
-        const expandedTools: (string | any)[] = [];
+        // Cast to any[] to handle YAML parsing that can contain objects
+        const rawTools = agent.tools as any[];
+        const expandedTools: string[] = [];
         
-        for (const tool of agent.tools) {
+        for (const tool of rawTools) {
           if (typeof tool === 'string') {
             if (tool === 'tools/*') {
               // User explicitly requested auto-discovery of all tools
@@ -206,16 +208,18 @@ export class FleetParser {
               // Regular tool name specified explicitly
               expandedTools.push(tool);
             }
-          } else if (typeof tool === 'object' && tool.from_bucket) {
+          } else if (typeof tool === 'object' && tool.name) {
             // Tool configuration object with bucket source
-            expandedTools.push(tool);
+            // Store the full config for later retrieval in registerRequiredTools
+            this.toolConfigs.set(tool.name, tool);
+            expandedTools.push(tool.name);
           } else {
             // Regular tool name specified explicitly (backward compatibility)
             expandedTools.push(tool);
           }
         }
         
-        // Remove duplicates
+        // Set normalized tool names
         agent.tools = [...new Set(expandedTools)];
       }
     }
@@ -235,24 +239,19 @@ export class FleetParser {
       ? existingTools 
       : ((existingTools as any).items || []);
     
-    // Collect all unique tool references from all agents
-    const requiredTools = new Map<string, string | any>();
+    // Collect all unique tool names from all agents
+    const requiredToolNames = new Set<string>();
     if (config.agents) {
       for (const agent of config.agents) {
         if (agent.tools) {
-          agent.tools.forEach(tool => {
-            if (typeof tool === 'string') {
-              requiredTools.set(tool, tool);
-            } else if (typeof tool === 'object' && tool.name) {
-              requiredTools.set(tool.name, tool);
-            }
-          });
+          agent.tools.forEach(toolName => requiredToolNames.add(toolName));
         }
       }
     }
     
     // Register missing tools
-    for (const [toolName, toolConfig] of requiredTools) {
+    for (const toolName of requiredToolNames) {
+      const toolConfig = this.toolConfigs.get(toolName);
       // Skip built-in tools
       if (['archival_memory_insert', 'archival_memory_search'].includes(toolName)) {
         const existingTool = existingToolsArray.find((t: any) => t.name === toolName);
