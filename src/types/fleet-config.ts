@@ -17,11 +17,20 @@ export interface AgentConfig {
   description: string;
   system_prompt: PromptConfig;
   llm_config: LLMConfig;
-  tools?: string[];
+  tools?: (string | ToolConfig)[];
   shared_blocks?: string[];
   memory_blocks?: MemoryBlock[];
   folders?: FolderConfig[];
   embedding?: string;
+}
+
+export interface ToolConfig {
+  name: string;
+  from_bucket: {
+    provider: string;
+    bucket: string;
+    path: string;
+  };
 }
 
 export interface FolderConfig {

@@ -67,25 +67,39 @@ export class FleetParser {
     return config;
   }
 
-  private async resolveBlockContent(block: any): Promise<void> {
-    if (block.from_file) {
+  /**
+   * Generic content resolver for any resource with from_file, from_bucket, or value
+   */
+  private async resolveContent(config: {
+    from_file?: string;
+    from_bucket?: any;
+    value?: string;
+  }, defaultPath?: string, resourceName?: string): Promise<string> {
+    if (config.from_file) {
       // Read from local filesystem
-      const filePath = path.resolve(this.basePath, block.from_file);
-      block.value = fs.readFileSync(filePath, 'utf8');
-    } else if (block.from_bucket) {
-      // Read from cloud bucket using new structure
-      const bucketConfig: BucketConfig = block.from_bucket;
-      block.value = await this.storageManager.readFromBucket(bucketConfig);
-    } else if (!block.value) {
-      // Smart default: look for memory-blocks/{name}.md
-      const defaultPath = path.resolve(this.basePath, 'memory-blocks', `${block.name}.md`);
-      if (fs.existsSync(defaultPath)) {
-        block.value = fs.readFileSync(defaultPath, 'utf8');
-        console.log(`Auto-loaded memory block: ${block.name} from memory-blocks/${block.name}.md`);
-      } else {
-        throw new Error(`Memory block '${block.name}' has no value, from_file, or from_bucket specified, and default file memory-blocks/${block.name}.md not found`);
+      const filePath = path.resolve(this.basePath, config.from_file);
+      return fs.readFileSync(filePath, 'utf8');
+    } else if (config.from_bucket) {
+      // Read from cloud bucket
+      const bucketConfig: BucketConfig = config.from_bucket;
+      return await this.storageManager.readFromBucket(bucketConfig);
+    } else if (config.value) {
+      return config.value;
+    } else if (defaultPath && fs.existsSync(defaultPath)) {
+      // Smart default fallback
+      const content = fs.readFileSync(defaultPath, 'utf8');
+      if (resourceName) {
+        console.log(`Auto-loaded ${resourceName} from ${path.relative(this.basePath, defaultPath)}`);
       }
+      return content;
+    } else {
+      throw new Error(`Resource has no value, from_file, or from_bucket specified${defaultPath ? `, and default file ${path.relative(this.basePath, defaultPath)} not found` : ''}`);
     }
+  }
+
+  private async resolveBlockContent(block: any): Promise<void> {
+    const defaultPath = path.resolve(this.basePath, 'memory-blocks', `${block.name}.md`);
+    block.value = await this.resolveContent(block, defaultPath, `memory block: ${block.name}`);
   }
 
   private async resolvePromptContent(prompt: any): Promise<void> {
@@ -96,20 +110,8 @@ export class FleetParser {
       baseInstructions = fs.readFileSync(basePath, 'utf8').trim();
     }
 
-    let userPrompt = '';
-    
-    if (prompt.from_file) {
-      const filePath = path.resolve(this.basePath, prompt.from_file);
-      userPrompt = fs.readFileSync(filePath, 'utf8').trim();
-    } else if (prompt.from_bucket) {
-      // Read from cloud bucket using new structure
-      const bucketConfig: BucketConfig = prompt.from_bucket;
-      userPrompt = (await this.storageManager.readFromBucket(bucketConfig)).trim();
-    } else if (prompt.value) {
-      userPrompt = prompt.value.trim();
-    } else {
-      throw new Error(`System prompt has no value, from_file, or from_bucket specified`);
-    }
+    // Use generic content resolver
+    const userPrompt = (await this.resolveContent(prompt, undefined, 'system prompt')).trim();
     
     // Concatenate base instructions with user prompt
     if (baseInstructions) {
@@ -186,21 +188,29 @@ export class FleetParser {
     for (const agent of config.agents) {
       if (agent.tools) {
         // Only auto-expand when explicitly specified in config
-        const expandedTools: string[] = [];
+        const expandedTools: (string | any)[] = [];
         
         for (const tool of agent.tools) {
-          if (tool === 'tools/*') {
-            // User explicitly requested auto-discovery of all tools
-            const toolsDir = path.resolve(this.basePath, 'tools');
-            if (fs.existsSync(toolsDir)) {
-              const toolFiles = fs.readdirSync(toolsDir)
-                .filter(file => file.endsWith('.py'))
-                .map(file => path.basename(file, '.py'));
-              expandedTools.push(...toolFiles);
-              console.log(`Auto-discovered ${toolFiles.length} tools: ${toolFiles.join(', ')}`);
+          if (typeof tool === 'string') {
+            if (tool === 'tools/*') {
+              // User explicitly requested auto-discovery of all tools
+              const toolsDir = path.resolve(this.basePath, 'tools');
+              if (fs.existsSync(toolsDir)) {
+                const toolFiles = fs.readdirSync(toolsDir)
+                  .filter(file => file.endsWith('.py'))
+                  .map(file => path.basename(file, '.py'));
+                expandedTools.push(...toolFiles);
+                console.log(`Auto-discovered ${toolFiles.length} tools: ${toolFiles.join(', ')}`);
+              }
+            } else {
+              // Regular tool name specified explicitly
+              expandedTools.push(tool);
             }
+          } else if (typeof tool === 'object' && tool.from_bucket) {
+            // Tool configuration object with bucket source
+            expandedTools.push(tool);
           } else {
-            // Regular tool name specified explicitly
+            // Regular tool name specified explicitly (backward compatibility)
             expandedTools.push(tool);
           }
         }
@@ -225,18 +235,24 @@ export class FleetParser {
       ? existingTools 
       : ((existingTools as any).items || []);
     
-    // Collect all unique tool names from all agents
-    const requiredTools = new Set<string>();
+    // Collect all unique tool references from all agents
+    const requiredTools = new Map<string, string | any>();
     if (config.agents) {
       for (const agent of config.agents) {
         if (agent.tools) {
-          agent.tools.forEach(tool => requiredTools.add(tool));
+          agent.tools.forEach(tool => {
+            if (typeof tool === 'string') {
+              requiredTools.set(tool, tool);
+            } else if (typeof tool === 'object' && tool.name) {
+              requiredTools.set(tool.name, tool);
+            }
+          });
         }
       }
     }
     
     // Register missing tools
-    for (const toolName of requiredTools) {
+    for (const [toolName, toolConfig] of requiredTools) {
       // Skip built-in tools
       if (['archival_memory_insert', 'archival_memory_search'].includes(toolName)) {
         const existingTool = existingToolsArray.find((t: any) => t.name === toolName);
@@ -248,35 +264,39 @@ export class FleetParser {
       
       // Check if tool already exists
       let tool = existingToolsArray.find((t: any) => t.name === toolName);
-      const toolPath = path.join(this.basePath, 'tools', `${toolName}.py`);
       
       if (!tool) {
         // Tool doesn't exist - register it
-        if (fs.existsSync(toolPath)) {
+        try {
           if (verbose) console.log(`Registering tool: ${toolName}`);
-          try {
-            const sourceCode = fs.readFileSync(toolPath, 'utf8');
-            tool = await client.createTool({ source_code: sourceCode });
-            if (verbose) console.log(`Tool ${toolName} registered`);
-          } catch (error: any) {
-            console.warn(`Failed to register tool ${toolName}: ${error.message}`);
-            continue;
-          }
-        } else {
-          console.warn(`Tool file not found: ${toolPath}`);
+          
+          const defaultPath = path.join(this.basePath, 'tools', `${toolName}.py`);
+          const sourceCode = await this.resolveContent(
+            typeof toolConfig === 'object' ? toolConfig : {},
+            defaultPath,
+            `tool: ${toolName}`
+          );
+          
+          tool = await client.createTool({ source_code: sourceCode });
+          if (verbose) console.log(`Tool ${toolName} registered`);
+        } catch (error: any) {
+          console.warn(`Failed to register tool ${toolName}: ${error.message}`);
           continue;
         }
       } else {
         // Tool exists - check if source code has changed
         const currentSourceHash = toolSourceHashes[toolName];
-        if (currentSourceHash && fs.existsSync(toolPath)) {
+        if (currentSourceHash) {
           // We have a hash for this tool, meaning source code is being tracked
-          // For comprehensive change detection, we would need to get the existing tool's 
-          // source code and compare hashes. For now, we'll re-register tools when
-          // their source exists and they're being tracked for changes.
           if (verbose) console.log(`Re-registering tool due to potential source changes: ${toolName}`);
           try {
-            const sourceCode = fs.readFileSync(toolPath, 'utf8');
+            const defaultPath = path.join(this.basePath, 'tools', `${toolName}.py`);
+            const sourceCode = await this.resolveContent(
+              typeof toolConfig === 'object' ? toolConfig : {},
+              defaultPath,
+              `tool: ${toolName}`
+            );
+            
             tool = await client.createTool({ source_code: sourceCode });
             if (verbose) console.log(`Tool ${toolName} re-registered`);
           } catch (error: any) {
