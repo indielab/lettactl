@@ -229,9 +229,6 @@ export async function applyCommand(options: { file: string; agent?: string; dryR
           // Check if any granular changes are needed
           const changes = agentManager.getConfigChanges(existingAgent, agentConfig);
           
-          console.log(`DEBUG APPLY - changes.hasChanges: ${changes.hasChanges}`);
-          console.log(`DEBUG APPLY - changes.changedComponents:`, changes.changedComponents);
-          
           if (!changes.hasChanges) {
             console.log(`Agent ${agent.name} already exists and is up to date`);
             continue;

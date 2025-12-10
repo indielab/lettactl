@@ -139,7 +139,6 @@ export class AgentManager {
       .map(block => {
         const fileHash = config.memoryBlockFileHashes?.[block.name];
         const valueHash = this.generateContentHash(block.value || '');
-        console.log(`DEBUG: Block ${block.name} - fileHash: ${fileHash}, valueHash: ${valueHash}, blockValue length: ${(block.value || '').length}`);
         return {
           name: block.name,
           description: block.description,
@@ -149,8 +148,6 @@ export class AgentManager {
       })
       .sort((a, b) => a.name.localeCompare(b.name));
     const memoryBlocksHash = this.generateContentHash(JSON.stringify(normalizedMemoryBlocks));
-    console.log(`DEBUG: normalizedMemoryBlocks:`, JSON.stringify(normalizedMemoryBlocks, null, 2));
-    console.log(`DEBUG: Final memoryBlocksHash: ${memoryBlocksHash}`);
     
     // Folders hash - includes file contents when available  
     const normalizedFolders = (config.folders || [])
@@ -263,13 +260,8 @@ export class AgentManager {
     if (existing.configHashes.model !== newHashes.model) {
       changedComponents.push('model');
     }
-    console.log(`DEBUG COMPARISON - existing.memoryBlocks: ${existing.configHashes.memoryBlocks}`);
-    console.log(`DEBUG COMPARISON - newHashes.memoryBlocks: ${newHashes.memoryBlocks}`);
     if (existing.configHashes.memoryBlocks !== newHashes.memoryBlocks) {
-      console.log(`DEBUG COMPARISON - MEMORY BLOCKS CHANGED!`);
       changedComponents.push('memoryBlocks');
-    } else {
-      console.log(`DEBUG COMPARISON - Memory blocks unchanged (hashes match)`);
     }
     if (existing.configHashes.folders !== newHashes.folders) {
       changedComponents.push('folders');

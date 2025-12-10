@@ -254,11 +254,13 @@ export class DiffEngine {
     desiredBlocks: Array<{ name: string; isShared?: boolean }>,
     memoryBlockFileHashes: Record<string, string> = {}
   ): Promise<BlockDiff> {
-    console.log(`DEBUG DIFF - memoryBlockFileHashes:`, memoryBlockFileHashes);
-    console.log(`DEBUG DIFF - currentBlocks:`, currentBlocks.map(b => ({ label: b.label, id: b.id })));
-    console.log(`DEBUG DIFF - desiredBlocks:`, desiredBlocks.map(b => ({ name: b.name, isShared: b.isShared })));
+    // Extract base names from versioned labels (e.g., "brand_identity__v__20251210-550e4a42" -> "brand_identity")
+    const extractBaseName = (label: string): string => {
+      const versionMatch = label.match(/^(.+?)(?:__v__.+)?$/);
+      return versionMatch ? versionMatch[1] : label;
+    };
     
-    const currentBlockNames = new Set(currentBlocks.map(b => b.label));
+    const currentBlockNames = new Set(currentBlocks.map(b => extractBaseName(b.label)));
     const desiredBlockNames = new Set(desiredBlocks.map(b => b.name));
 
     const toAdd: Array<{ name: string; id: string }> = [];
@@ -273,8 +275,6 @@ export class DiffEngine {
           ? this.blockManager.getSharedBlockId(blockConfig.name)
           : this.blockManager.getAgentBlockId(blockConfig.name);
         
-        console.log(`DEBUG DIFF - Looking for block '${blockConfig.name}', isShared: ${blockConfig.isShared}, found ID: ${blockId}`);
-        
         if (blockId) {
           toAdd.push({ name: blockConfig.name, id: blockId });
         }
@@ -283,9 +283,10 @@ export class DiffEngine {
 
     // Find blocks to remove, update (content changed), or unchanged
     for (const block of currentBlocks) {
-      if (desiredBlockNames.has(block.label)) {
+      const baseName = extractBaseName(block.label);
+      if (desiredBlockNames.has(baseName)) {
         // Block exists in both current and desired
-        const blockName = block.label;
+        const blockName = baseName;
         
         // Check if content has changed by comparing with file hash
         if (this.hasFileBasedContent(blockName, memoryBlockFileHashes)) {
