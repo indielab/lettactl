@@ -5,16 +5,44 @@ import { validateResourceType, validateRequired } from '../lib/validators';
 import { withErrorHandling } from '../lib/error-handler';
 import { createSpinner, getSpinnerEnabled } from '../lib/spinner';
 
+const SUPPORTED_RESOURCES = ['agent', 'agents', 'block', 'blocks', 'tool', 'tools', 'folder', 'folders'];
+
 async function describeCommandImpl(resource: string, name: string, options?: { output?: string }, command?: any) {
-  validateResourceType(resource, ['agent', 'agents']);
-  validateRequired(name, 'Agent name', 'lettactl describe agent <name>');
+  validateResourceType(resource, SUPPORTED_RESOURCES);
+
+  // Normalize resource to singular form
+  const normalizedResource = resource.replace(/s$/, '');
+  validateRequired(name, `${normalizedResource.charAt(0).toUpperCase() + normalizedResource.slice(1)} name`, `lettactl describe ${normalizedResource} <name>`);
 
   const client = new LettaClientWrapper();
   const resolver = new AgentResolver(client);
-  
   const spinnerEnabled = getSpinnerEnabled(command);
+
+  switch (normalizedResource) {
+    case 'agent':
+      await describeAgent(client, resolver, name, options, spinnerEnabled);
+      break;
+    case 'block':
+      await describeBlock(client, resolver, name, options, spinnerEnabled);
+      break;
+    case 'tool':
+      await describeTool(client, resolver, name, options, spinnerEnabled);
+      break;
+    case 'folder':
+      await describeFolder(client, resolver, name, options, spinnerEnabled);
+      break;
+  }
+}
+
+async function describeAgent(
+  client: LettaClientWrapper,
+  resolver: AgentResolver,
+  name: string,
+  options?: { output?: string },
+  spinnerEnabled?: boolean
+) {
   const spinner = createSpinner(`Loading details for agent ${name}...`, spinnerEnabled).start();
-  
+
   try {
     // Find agent by name
     const { agent } = await resolver.findAgentByName(name);
@@ -131,6 +159,214 @@ async function describeCommandImpl(resource: string, name: string, options?: { o
     }
   } catch (error) {
     spinner.fail(`Failed to load details for agent ${name}`);
+    throw error;
+  }
+}
+
+async function describeBlock(
+  client: LettaClientWrapper,
+  resolver: AgentResolver,
+  name: string,
+  options?: { output?: string },
+  spinnerEnabled?: boolean
+) {
+  const spinner = createSpinner(`Loading details for block ${name}...`, spinnerEnabled).start();
+
+  try {
+    // Find block by name/label
+    const allBlocks = await client.listBlocks();
+    const block = allBlocks.find((b: any) => b.label === name || b.name === name || b.id === name);
+
+    if (!block) {
+      spinner.fail(`Block "${name}" not found`);
+      throw new Error(`Block "${name}" not found`);
+    }
+
+    // Compute which agents use this block
+    spinner.text = 'Finding attached agents...';
+    const allAgents = await resolver.getAllAgents();
+    const attachedAgents: any[] = [];
+
+    for (const agent of allAgents) {
+      const agentBlocks = await client.listAgentBlocks(agent.id);
+      const blockList = Array.isArray(agentBlocks) ? agentBlocks : (agentBlocks as any).items || [];
+      if (blockList.some((b: any) => b.id === block.id)) {
+        attachedAgents.push(agent);
+      }
+    }
+
+    spinner.stop();
+
+    if (OutputFormatter.handleJsonOutput({ ...block, attached_agents: attachedAgents }, options?.output)) {
+      return;
+    }
+
+    console.log(`Block Details: ${block.label || block.name}`);
+    console.log(`${'='.repeat(50)}`);
+    console.log(`ID:            ${block.id}`);
+    console.log(`Label:         ${block.label || '-'}`);
+    console.log(`Description:   ${block.description || '-'}`);
+    console.log(`Limit:         ${block.limit || 'No limit'} characters`);
+    console.log(`Current Size:  ${block.value?.length || 0} characters`);
+    console.log(`Created:       ${block.created_at || 'Unknown'}`);
+
+    console.log(`\nAttached Agents (${attachedAgents.length}):`);
+    if (attachedAgents.length > 0) {
+      for (const agent of attachedAgents) {
+        console.log(`  - ${agent.name} (${agent.id})`);
+      }
+    } else {
+      console.log(`  (none - orphaned block)`);
+    }
+
+    console.log(`\nValue Preview:`);
+    if (block.value) {
+      const preview = block.value.length > 500 ? block.value.substring(0, 500) + '...' : block.value;
+      console.log(preview);
+    } else {
+      console.log(`  (empty)`);
+    }
+  } catch (error) {
+    spinner.fail(`Failed to load details for block ${name}`);
+    throw error;
+  }
+}
+
+async function describeTool(
+  client: LettaClientWrapper,
+  resolver: AgentResolver,
+  name: string,
+  options?: { output?: string },
+  spinnerEnabled?: boolean
+) {
+  const spinner = createSpinner(`Loading details for tool ${name}...`, spinnerEnabled).start();
+
+  try {
+    // Find tool by name
+    const allTools = await client.listTools();
+    const tool = allTools.find((t: any) => t.name === name || t.id === name);
+
+    if (!tool) {
+      spinner.fail(`Tool "${name}" not found`);
+      throw new Error(`Tool "${name}" not found`);
+    }
+
+    // Compute which agents use this tool
+    spinner.text = 'Finding attached agents...';
+    const allAgents = await resolver.getAllAgents();
+    const attachedAgents: any[] = [];
+
+    for (const agent of allAgents) {
+      const agentTools = await client.listAgentTools(agent.id);
+      const toolList = Array.isArray(agentTools) ? agentTools : (agentTools as any).items || [];
+      if (toolList.some((t: any) => t.id === tool.id)) {
+        attachedAgents.push(agent);
+      }
+    }
+
+    spinner.stop();
+
+    if (OutputFormatter.handleJsonOutput({ ...tool, attached_agents: attachedAgents }, options?.output)) {
+      return;
+    }
+
+    console.log(`Tool Details: ${tool.name}`);
+    console.log(`${'='.repeat(50)}`);
+    console.log(`ID:            ${tool.id}`);
+    console.log(`Name:          ${tool.name}`);
+    console.log(`Description:   ${tool.description || '-'}`);
+    console.log(`Module:        ${tool.module || '-'}`);
+    console.log(`Created:       ${tool.created_at || 'Unknown'}`);
+
+    console.log(`\nAttached Agents (${attachedAgents.length}):`);
+    if (attachedAgents.length > 0) {
+      for (const agent of attachedAgents) {
+        console.log(`  - ${agent.name} (${agent.id})`);
+      }
+    } else {
+      console.log(`  (none - orphaned tool)`);
+    }
+
+    if (tool.source_code) {
+      console.log(`\nSource Code:`);
+      const preview = tool.source_code.length > 1000 ? tool.source_code.substring(0, 1000) + '\n...(truncated)' : tool.source_code;
+      console.log(preview);
+    }
+  } catch (error) {
+    spinner.fail(`Failed to load details for tool ${name}`);
+    throw error;
+  }
+}
+
+async function describeFolder(
+  client: LettaClientWrapper,
+  resolver: AgentResolver,
+  name: string,
+  options?: { output?: string },
+  spinnerEnabled?: boolean
+) {
+  const spinner = createSpinner(`Loading details for folder ${name}...`, spinnerEnabled).start();
+
+  try {
+    // Find folder by name
+    const allFolders = await client.listFolders();
+    const folder = allFolders.find((f: any) => f.name === name || f.id === name);
+
+    if (!folder) {
+      spinner.fail(`Folder "${name}" not found`);
+      throw new Error(`Folder "${name}" not found`);
+    }
+
+    // Get folder files
+    spinner.text = 'Loading folder contents...';
+    const files = await client.listFolderFiles(folder.id);
+    const fileList = Array.isArray(files) ? files : (files as any).items || [];
+
+    // Compute which agents use this folder
+    spinner.text = 'Finding attached agents...';
+    const allAgents = await resolver.getAllAgents();
+    const attachedAgents: any[] = [];
+
+    for (const agent of allAgents) {
+      const agentFolders = await client.listAgentFolders(agent.id);
+      const folderList = Array.isArray(agentFolders) ? agentFolders : (agentFolders as any).items || [];
+      if (folderList.some((f: any) => f.id === folder.id)) {
+        attachedAgents.push(agent);
+      }
+    }
+
+    spinner.stop();
+
+    if (OutputFormatter.handleJsonOutput({ ...folder, files: fileList, attached_agents: attachedAgents }, options?.output)) {
+      return;
+    }
+
+    console.log(`Folder Details: ${folder.name}`);
+    console.log(`${'='.repeat(50)}`);
+    console.log(`ID:            ${folder.id}`);
+    console.log(`Name:          ${folder.name}`);
+    console.log(`Description:   ${folder.description || '-'}`);
+    console.log(`Created:       ${folder.created_at || 'Unknown'}`);
+
+    console.log(`\nAttached Agents (${attachedAgents.length}):`);
+    if (attachedAgents.length > 0) {
+      for (const agent of attachedAgents) {
+        console.log(`  - ${agent.name} (${agent.id})`);
+      }
+    } else {
+      console.log(`  (none - orphaned folder)`);
+    }
+
+    console.log(`\nFiles (${fileList.length}):`);
+    if (fileList.length > 0) {
+      for (const file of fileList) {
+        console.log(`  - ${file.name || file.file_name || file.id}`);
+      }
+    } else {
+      console.log(`  (empty folder)`);
+    }
+  } catch (error) {
+    spinner.fail(`Failed to load details for folder ${name}`);
     throw error;
   }
 }
