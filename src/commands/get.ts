@@ -4,6 +4,7 @@ import { OutputFormatter } from '../lib/output-formatter';
 import { validateResourceType } from '../lib/validators';
 import { withErrorHandling } from '../lib/error-handler';
 import { createSpinner, getSpinnerEnabled } from '../lib/spinner';
+import { normalizeToArray, computeAgentCounts } from '../lib/resource-usage';
 
 const SUPPORTED_RESOURCES = ['agents', 'blocks', 'tools', 'folders'];
 
@@ -129,8 +130,7 @@ async function getBlocks(
     let agentCounts: Map<string, number> | undefined;
 
     if (agentId) {
-      const blocks = await client.listAgentBlocks(agentId);
-      blockList = Array.isArray(blocks) ? blocks : (blocks as any).items || [];
+      blockList = normalizeToArray(await client.listAgentBlocks(agentId));
     } else if (options?.shared) {
       blockList = await client.listBlocks({ connectedAgentsCountGt: 1 });
     } else if (options?.orphaned) {
@@ -142,19 +142,7 @@ async function getBlocks(
     // For wide output, compute agent counts
     if (isWide && !agentId) {
       spinner.text = 'Computing block usage...';
-      agentCounts = new Map<string, number>();
-      blockList.forEach((b: any) => agentCounts!.set(b.id, 0));
-
-      const allAgents = await resolver.getAllAgents();
-      for (const agent of allAgents) {
-        const agentBlocks = await client.listAgentBlocks(agent.id);
-        const agentBlockList = Array.isArray(agentBlocks) ? agentBlocks : (agentBlocks as any).items || [];
-        for (const block of agentBlockList) {
-          if (agentCounts!.has(block.id)) {
-            agentCounts!.set(block.id, (agentCounts!.get(block.id) || 0) + 1);
-          }
-        }
-      }
+      agentCounts = await computeAgentCounts(client, resolver, 'blocks', blockList.map((b: any) => b.id));
     }
 
     spinner.stop();
@@ -200,28 +188,13 @@ async function getTools(
     let agentCounts: Map<string, number> | undefined;
 
     if (agentId) {
-      const tools = await client.listAgentTools(agentId);
-      toolList = Array.isArray(tools) ? tools : (tools as any).items || [];
+      toolList = normalizeToArray(await client.listAgentTools(agentId));
     } else if (needAgentCounts) {
-      // Client-side computation: count tool usage across all agents
       spinner.text = 'Fetching all tools...';
       const allTools = await client.listTools();
 
-      spinner.text = 'Fetching all agents...';
-      const allAgents = await resolver.getAllAgents();
-
       spinner.text = 'Computing tool usage...';
-      agentCounts = new Map<string, number>();
-      allTools.forEach((t: any) => agentCounts!.set(t.id, 0));
-
-      for (const agent of allAgents) {
-        const agentTools = await client.listAgentTools(agent.id);
-        const agentToolList = Array.isArray(agentTools) ? agentTools : (agentTools as any).items || [];
-        for (const tool of agentToolList) {
-          const count = agentCounts!.get(tool.id) || 0;
-          agentCounts!.set(tool.id, count + 1);
-        }
-      }
+      agentCounts = await computeAgentCounts(client, resolver, 'tools', allTools.map((t: any) => t.id));
 
       // Filter based on flag
       if (options?.shared) {
@@ -277,28 +250,13 @@ async function getFolders(
     let agentCounts: Map<string, number> | undefined;
 
     if (agentId) {
-      const folders = await client.listAgentFolders(agentId);
-      folderList = Array.isArray(folders) ? folders : (folders as any).items || [];
+      folderList = normalizeToArray(await client.listAgentFolders(agentId));
     } else if (needAgentCounts) {
-      // Client-side computation: count folder usage across all agents
       spinner.text = 'Fetching all folders...';
       const allFolders = await client.listFolders();
 
-      spinner.text = 'Fetching all agents...';
-      const allAgents = await resolver.getAllAgents();
-
       spinner.text = 'Computing folder usage...';
-      agentCounts = new Map<string, number>();
-      allFolders.forEach((f: any) => agentCounts!.set(f.id, 0));
-
-      for (const agent of allAgents) {
-        const agentFolders = await client.listAgentFolders(agent.id);
-        const agentFolderList = Array.isArray(agentFolders) ? agentFolders : (agentFolders as any).items || [];
-        for (const folder of agentFolderList) {
-          const count = agentCounts!.get(folder.id) || 0;
-          agentCounts!.set(folder.id, count + 1);
-        }
-      }
+      agentCounts = await computeAgentCounts(client, resolver, 'folders', allFolders.map((f: any) => f.id));
 
       // Filter based on flag
       if (options?.shared) {

@@ -71,9 +71,9 @@ program
 // Describe command - detailed agent info
 program
   .command('describe')
-  .description('Show detailed information about an agent')
-  .argument('<resource>', 'resource type (agent)')
-  .argument('<name>', 'agent name')
+  .description('Show detailed information about a resource')
+  .argument('<resource>', 'resource type (agent|block|tool|folder)')
+  .argument('<name>', 'resource name')
   .option('-o, --output <format>', 'output format (table, json)', 'table')
   .action(describeCommand);
 

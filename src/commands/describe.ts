@@ -4,6 +4,7 @@ import { OutputFormatter } from '../lib/output-formatter';
 import { validateResourceType, validateRequired } from '../lib/validators';
 import { withErrorHandling } from '../lib/error-handler';
 import { createSpinner, getSpinnerEnabled } from '../lib/spinner';
+import { normalizeToArray, findAttachedAgents } from '../lib/resource-usage';
 
 const SUPPORTED_RESOURCES = ['agent', 'agents', 'block', 'blocks', 'tool', 'tools', 'folder', 'folders'];
 
@@ -114,8 +115,7 @@ async function describeAgent(
         
         // Get folder file count
         try {
-          const files = await client.listFolderFiles(folder.id);
-          const fileList = Array.isArray(files) ? files : ((files as any).items || []);
+          const fileList = normalizeToArray(await client.listFolderFiles(folder.id));
           console.log(`    Files: ${fileList.length}`);
           
           // Show first few files
@@ -139,8 +139,7 @@ async function describeAgent(
     
     // Messages (recent)
     try {
-      const messages = await client.getAgentMessages(agentDetails.id, 5);
-      const messageList = Array.isArray(messages) ? messages : ((messages as any).items || []);
+      const messageList = normalizeToArray(await client.getAgentMessages(agentDetails.id, 5));
       
       if (messageList.length > 0) {
         console.log(`Recent Messages (${messageList.length} of last 5):`);
@@ -184,16 +183,7 @@ async function describeBlock(
 
     // Compute which agents use this block
     spinner.text = 'Finding attached agents...';
-    const allAgents = await resolver.getAllAgents();
-    const attachedAgents: any[] = [];
-
-    for (const agent of allAgents) {
-      const agentBlocks = await client.listAgentBlocks(agent.id);
-      const blockList = Array.isArray(agentBlocks) ? agentBlocks : (agentBlocks as any).items || [];
-      if (blockList.some((b: any) => b.id === block.id)) {
-        attachedAgents.push(agent);
-      }
-    }
+    const attachedAgents = await findAttachedAgents(client, resolver, 'blocks', block.id);
 
     spinner.stop();
 
@@ -253,16 +243,7 @@ async function describeTool(
 
     // Compute which agents use this tool
     spinner.text = 'Finding attached agents...';
-    const allAgents = await resolver.getAllAgents();
-    const attachedAgents: any[] = [];
-
-    for (const agent of allAgents) {
-      const agentTools = await client.listAgentTools(agent.id);
-      const toolList = Array.isArray(agentTools) ? agentTools : (agentTools as any).items || [];
-      if (toolList.some((t: any) => t.id === tool.id)) {
-        attachedAgents.push(agent);
-      }
-    }
+    const attachedAgents = await findAttachedAgents(client, resolver, 'tools', tool.id);
 
     spinner.stop();
 
@@ -319,21 +300,11 @@ async function describeFolder(
 
     // Get folder files
     spinner.text = 'Loading folder contents...';
-    const files = await client.listFolderFiles(folder.id);
-    const fileList = Array.isArray(files) ? files : (files as any).items || [];
+    const fileList = normalizeToArray(await client.listFolderFiles(folder.id));
 
     // Compute which agents use this folder
     spinner.text = 'Finding attached agents...';
-    const allAgents = await resolver.getAllAgents();
-    const attachedAgents: any[] = [];
-
-    for (const agent of allAgents) {
-      const agentFolders = await client.listAgentFolders(agent.id);
-      const folderList = Array.isArray(agentFolders) ? agentFolders : (agentFolders as any).items || [];
-      if (folderList.some((f: any) => f.id === folder.id)) {
-        attachedAgents.push(agent);
-      }
-    }
+    const attachedAgents = await findAttachedAgents(client, resolver, 'folders', folder.id);
 
     spinner.stop();
 
