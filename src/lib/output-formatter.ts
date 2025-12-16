@@ -22,7 +22,29 @@ export class OutputFormatter {
   /**
    * Creates a table for agent listing
    */
-  static createAgentTable(agents: any[]): string {
+  static createAgentTable(agents: any[], wide: boolean = false): string {
+    if (wide) {
+      const table = new Table({
+        head: ['NAME', 'ID', 'MODEL', 'BLOCKS', 'TOOLS'],
+        colWidths: [25, 40, 25, 8, 8]
+      });
+
+      for (const agent of agents) {
+        const model = agent.llm_config?.model || agent.model || '-';
+        const blockCount = agent.memory?.blocks?.length || agent.blocks?.length || '-';
+        const toolCount = agent.tools?.length || '-';
+        table.push([
+          agent.name || 'Unknown',
+          agent.id || 'Unknown',
+          model.length > 23 ? model.substring(0, 20) + '...' : model,
+          blockCount.toString(),
+          toolCount.toString()
+        ]);
+      }
+
+      return table.toString();
+    }
+
     const table = new Table({
       head: ['NAME', 'ID'],
       colWidths: [30, 50]
@@ -40,8 +62,30 @@ export class OutputFormatter {
 
   /**
    * Creates a table for block listing
+   * @param agentCounts - Optional map of block ID to agent count (for wide output)
    */
-  static createBlockTable(blocks: any[]): string {
+  static createBlockTable(blocks: any[], wide: boolean = false, agentCounts?: Map<string, number>): string {
+    if (wide) {
+      const table = new Table({
+        head: ['NAME', 'ID', 'LIMIT', 'SIZE', 'AGENTS'],
+        colWidths: [30, 35, 8, 8, 8]
+      });
+
+      for (const block of blocks) {
+        const valueSize = block.value?.length || 0;
+        const agentCount = agentCounts?.get(block.id) ?? '-';
+        table.push([
+          block.label || block.name || 'Unknown',
+          block.id || 'Unknown',
+          block.limit?.toString() || '-',
+          valueSize.toString(),
+          agentCount.toString()
+        ]);
+      }
+
+      return table.toString();
+    }
+
     const table = new Table({
       head: ['NAME', 'ID', 'LIMIT'],
       colWidths: [35, 40, 10]
@@ -60,8 +104,27 @@ export class OutputFormatter {
 
   /**
    * Creates a table for tool listing
+   * @param agentCounts - Optional map of tool ID to agent count (for wide output)
    */
-  static createToolTable(tools: any[]): string {
+  static createToolTable(tools: any[], wide: boolean = false, agentCounts?: Map<string, number>): string {
+    if (wide) {
+      const table = new Table({
+        head: ['NAME', 'ID', 'AGENTS'],
+        colWidths: [35, 45, 8]
+      });
+
+      for (const tool of tools) {
+        const agentCount = agentCounts?.get(tool.id) ?? '-';
+        table.push([
+          tool.name || 'Unknown',
+          tool.id || 'Unknown',
+          agentCount.toString()
+        ]);
+      }
+
+      return table.toString();
+    }
+
     const table = new Table({
       head: ['NAME', 'ID'],
       colWidths: [35, 50]
@@ -79,8 +142,27 @@ export class OutputFormatter {
 
   /**
    * Creates a table for folder listing
+   * @param agentCounts - Optional map of folder ID to agent count (for wide output)
    */
-  static createFolderTable(folders: any[]): string {
+  static createFolderTable(folders: any[], wide: boolean = false, agentCounts?: Map<string, number>): string {
+    if (wide) {
+      const table = new Table({
+        head: ['NAME', 'ID', 'AGENTS'],
+        colWidths: [35, 45, 8]
+      });
+
+      for (const folder of folders) {
+        const agentCount = agentCounts?.get(folder.id) ?? '-';
+        table.push([
+          folder.name || 'Unknown',
+          folder.id || 'Unknown',
+          agentCount.toString()
+        ]);
+      }
+
+      return table.toString();
+    }
+
     const table = new Table({
       head: ['NAME', 'ID'],
       colWidths: [35, 50]
