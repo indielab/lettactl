@@ -63,6 +63,7 @@ program
   .argument('<resource>', 'resource type (agents|blocks|tools|folders)')
   .argument('[name]', 'specific resource name (optional)')
   .option('-o, --output <format>', 'output format (table|json|yaml)', 'table')
+  .option('-a, --agent <name>', 'filter by agent name (for blocks, tools, folders)')
   .action(getCommand);
 
 // Describe command - detailed agent info

@@ -7,12 +7,35 @@ import { createSpinner, getSpinnerEnabled } from '../lib/spinner';
 
 const SUPPORTED_RESOURCES = ['agents', 'blocks', 'tools', 'folders'];
 
-async function getCommandImpl(resource: string, _name?: string, options?: { output: string }, command?: any) {
+interface GetOptions {
+  output?: string;
+  agent?: string;
+}
+
+async function getCommandImpl(resource: string, _name?: string, options?: GetOptions, command?: any) {
   validateResourceType(resource, SUPPORTED_RESOURCES);
 
   const client = new LettaClientWrapper();
   const resolver = new AgentResolver(client);
   const spinnerEnabled = getSpinnerEnabled(command);
+
+  // If --agent flag is provided, resolve agent name to ID
+  let agentId: string | undefined;
+  if (options?.agent) {
+    if (resource === 'agents') {
+      console.log('Note: --agent flag is ignored for "get agents"');
+    } else {
+      const spinner = createSpinner(`Resolving agent ${options.agent}...`, spinnerEnabled).start();
+      try {
+        const { agent } = await resolver.findAgentByName(options.agent);
+        agentId = agent.id;
+        spinner.stop();
+      } catch (error) {
+        spinner.fail(`Agent "${options.agent}" not found`);
+        throw error;
+      }
+    }
+  }
 
   // Handle each resource type
   switch (resource) {
@@ -20,13 +43,13 @@ async function getCommandImpl(resource: string, _name?: string, options?: { outp
       await getAgents(resolver, options, spinnerEnabled);
       break;
     case 'blocks':
-      await getBlocks(client, options, spinnerEnabled);
+      await getBlocks(client, options, spinnerEnabled, agentId);
       break;
     case 'tools':
-      await getTools(client, options, spinnerEnabled);
+      await getTools(client, options, spinnerEnabled, agentId);
       break;
     case 'folders':
-      await getFolders(client, options, spinnerEnabled);
+      await getFolders(client, options, spinnerEnabled, agentId);
       break;
   }
 }
@@ -61,13 +84,20 @@ async function getAgents(
 async function getBlocks(
   client: LettaClientWrapper,
   options?: { output?: string },
-  spinnerEnabled?: boolean
+  spinnerEnabled?: boolean,
+  agentId?: string
 ) {
-  const spinner = createSpinner('Loading blocks...', spinnerEnabled).start();
+  const label = agentId ? 'Loading agent blocks...' : 'Loading blocks...';
+  const spinner = createSpinner(label, spinnerEnabled).start();
 
   try {
-    const blocks = await client.listBlocks();
-    const blockList = Array.isArray(blocks) ? blocks : (blocks as any).items || [];
+    let blockList: any[];
+    if (agentId) {
+      const blocks = await client.listAgentBlocks(agentId);
+      blockList = Array.isArray(blocks) ? blocks : (blocks as any).items || [];
+    } else {
+      blockList = await client.listBlocks();
+    }
     spinner.stop();
 
     if (OutputFormatter.handleJsonOutput(blockList, options?.output)) {
@@ -75,7 +105,7 @@ async function getBlocks(
     }
 
     if (blockList.length === 0) {
-      console.log('No blocks found');
+      console.log(agentId ? 'No blocks attached to this agent' : 'No blocks found');
       return;
     }
 
@@ -89,13 +119,20 @@ async function getBlocks(
 async function getTools(
   client: LettaClientWrapper,
   options?: { output?: string },
-  spinnerEnabled?: boolean
+  spinnerEnabled?: boolean,
+  agentId?: string
 ) {
-  const spinner = createSpinner('Loading tools...', spinnerEnabled).start();
+  const label = agentId ? 'Loading agent tools...' : 'Loading tools...';
+  const spinner = createSpinner(label, spinnerEnabled).start();
 
   try {
-    const tools = await client.listTools();
-    const toolList = Array.isArray(tools) ? tools : (tools as any).items || [];
+    let toolList: any[];
+    if (agentId) {
+      const tools = await client.listAgentTools(agentId);
+      toolList = Array.isArray(tools) ? tools : (tools as any).items || [];
+    } else {
+      toolList = await client.listTools();
+    }
     spinner.stop();
 
     if (OutputFormatter.handleJsonOutput(toolList, options?.output)) {
@@ -103,7 +140,7 @@ async function getTools(
     }
 
     if (toolList.length === 0) {
-      console.log('No tools found');
+      console.log(agentId ? 'No tools attached to this agent' : 'No tools found');
       return;
     }
 
@@ -117,13 +154,20 @@ async function getTools(
 async function getFolders(
   client: LettaClientWrapper,
   options?: { output?: string },
-  spinnerEnabled?: boolean
+  spinnerEnabled?: boolean,
+  agentId?: string
 ) {
-  const spinner = createSpinner('Loading folders...', spinnerEnabled).start();
+  const label = agentId ? 'Loading agent folders...' : 'Loading folders...';
+  const spinner = createSpinner(label, spinnerEnabled).start();
 
   try {
-    const folders = await client.listFolders();
-    const folderList = Array.isArray(folders) ? folders : (folders as any).items || [];
+    let folderList: any[];
+    if (agentId) {
+      const folders = await client.listAgentFolders(agentId);
+      folderList = Array.isArray(folders) ? folders : (folders as any).items || [];
+    } else {
+      folderList = await client.listFolders();
+    }
     spinner.stop();
 
     if (OutputFormatter.handleJsonOutput(folderList, options?.output)) {
@@ -131,7 +175,7 @@ async function getFolders(
     }
 
     if (folderList.length === 0) {
-      console.log('No folders found');
+      console.log(agentId ? 'No folders attached to this agent' : 'No folders found');
       return;
     }
 
