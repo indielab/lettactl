@@ -15,20 +15,6 @@ A kubectl-style CLI for managing stateful Letta AI agent fleets with declarative
 | `npm install -g lettactl` | `npm install lettactl` |
 | Perfect for DevOps workflows | Perfect for SaaS platforms |
 
-## Features
-
-- 🚀 **Declarative Configuration** - Define agents in YAML, deploy with one command
-- 🔄 **Smart Updates** - Only updates what actually changed, preserves conversation history
-- 🎯 **Intelligent Change Detection** - Automatically detects file content changes, tool updates, and memory block modifications
-- 🧠 **Fleet Management** - Deploy and manage multiple related agents together
-- 💬 **Message Operations** - Send messages, stream responses, manage conversations
-- 📦 **Resource Sharing** - Share memory blocks and tools across agents
-- 🗑️ **Bulk Operations** - Pattern-based bulk delete with safety previews and shared resource preservation
-- 🔧 **Tool And Documentation Discovery** - Auto-discover custom Python tools & all documents to be pushed to letta folders
-- 📁 **Configurable Root Directory** - Use `--root` flag to specify custom base directory for file resolution
-- 🛠️ **Programmatic SDK** - Use as a library for building multi-tenant applications
-- ☁️ **Cloud Storage** - Supabase integration for fleet configurations and content
-
 ## Prerequisites
 - Node.js 18+ 
 - A running Letta server instance
@@ -213,10 +199,12 @@ lettactl delete-all agents --pattern "PROD.*" --force   # Matches "prod-agent-1"
 ```
 
 **What gets deleted:**
-- ✅ Agent-specific memory blocks
-- ✅ Agent-specific folders (if not shared)
-- ✅ Associated conversation history
-- ❌ Shared blocks and folders (preserved)
+- Agent-specific memory blocks
+- Agent-specific folders (if not shared)
+- Associated conversation history
+
+**What gets preserved:**
+- Shared blocks and folders used by other agents
 
 **Safety Features:**
 - Always shows preview before deletion
@@ -265,21 +253,6 @@ lettactl messages my-agent             # View conversation history
 ### Validate Configuration
 ```bash
 lettactl validate -f agents.yml       # Check config syntax
-```
-
-### Remove Resources
-```bash
-# Delete single agent
-lettactl delete agent my-agent --force  # Delete agent
-
-# Bulk delete with pattern matching
-lettactl delete-all agents --pattern "test.*" --force    # Delete all agents matching "test*"
-lettactl delete-all agents --pattern "(dev|staging).*"   # Complex regex patterns
-lettactl delete-all agents --pattern ".*temp.*"          # Match anywhere in name/ID
-lettactl delete-all agents --force                       # Delete ALL agents (dangerous!)
-
-# Preview what will be deleted (without --force)
-lettactl delete-all agents --pattern "test.*"            # Shows preview, asks for --force
 ```
 
 ---
@@ -563,7 +536,7 @@ vim agents.yml
 
 # Deploy - only changed parts update
 lettactl apply -f agents.yml
-# Conversation history preserved! 🎉
+# Conversation history preserved
 ```
 
 ## Complete Configuration Reference
@@ -654,27 +627,6 @@ your-project/
 
 ## Advanced Features
 
-### Fleet Cleanup Workflows
-
-Common patterns for managing agent fleets at scale:
-
-```bash
-# Development workflow - clean up test agents after feature work
-lettactl delete-all agents --pattern "feature-.*" --force
-
-# Staging cleanup - remove old staging agents but keep current ones
-lettactl delete-all agents --pattern "staging-old.*" --force
-
-# Version cleanup - remove old versioned agents
-lettactl delete-all agents --pattern ".*__v__2024.*" --force
-
-# Emergency cleanup - remove all temporary/test agents
-lettactl delete-all agents --pattern "(temp|test|debug).*" --force
-
-# CI/CD cleanup - remove agents created by failed builds
-lettactl delete-all agents --pattern ".*-pr-[0-9]+$" --force
-```
-
 ### Environment Management
 
 ```bash
@@ -697,7 +649,7 @@ export SUPABASE_URL=https://your-project.supabase.co
 export SUPABASE_ANON_KEY=sb_publishable_your_anon_key
 ```
 
-**⚠️ Important: Use the ANON key, not the service role key**
+**Important: Use the ANON key, not the service role key**
 - Go to Supabase Dashboard > Settings > API
 - Copy the "anon public" key (starts with `sb_publishable_...`)
 - Do NOT use the "service role" key for lettactl
@@ -724,22 +676,6 @@ agents:
           provider: supabase
           bucket: my-configs  
           path: knowledge/company-info.md
-```
-
-### Update Workflows
-
-```bash
-# Edit your configuration
-vim agents.yml
-
-# Preview changes
-lettactl apply -f agents.yml --dry-run
-
-# Deploy changes - only modified agents get new versions
-lettactl apply -f agents.yml
-
-# Check what was created
-lettactl get agents
 ```
 
 ## Implementation Notes
