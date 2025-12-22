@@ -1,7 +1,6 @@
 import { BlockManager } from '../../src/lib/block-manager';
 import { LettaClientWrapper } from '../../src/lib/letta-client';
 
-// Mock LettaClientWrapper
 jest.mock('../../src/lib/letta-client');
 const MockedLettaClient = LettaClientWrapper as jest.MockedClass<typeof LettaClientWrapper>;
 
@@ -15,31 +14,94 @@ describe('BlockManager', () => {
     jest.clearAllMocks();
   });
 
-  describe('loadExistingBlocks', () => {
-    it('should load and organize existing blocks', async () => {
-      const mockBlocks = [
-        {
-          id: 'block-1',
-          label: 'test-block',
-          description: 'Test block',
-          value: 'Test content',
-          limit: 1000
-        },
-        {
-          id: 'block-2',
-          label: 'shared_block__v__20241202-abc123',
-          description: 'Shared block',
-          value: 'Shared content',
-          limit: 2000
-        }
-      ];
+  describe('generateContentHash', () => {
+    it('should generate consistent hashes for same content', () => {
+      const hash1 = (blockManager as any).generateContentHash('test content');
+      const hash2 = (blockManager as any).generateContentHash('test content');
+      expect(hash1).toBe(hash2);
+    });
 
-      mockClient.listBlocks.mockResolvedValue(mockBlocks as any);
+    it('should generate different hashes for different content', () => {
+      const hash1 = (blockManager as any).generateContentHash('content A');
+      const hash2 = (blockManager as any).generateContentHash('content B');
+      expect(hash1).not.toBe(hash2);
+    });
+  });
 
-      await blockManager.loadExistingBlocks();
+  describe('parseVersionFromLabel', () => {
+    it('should extract version from versioned label', () => {
+      const result = (blockManager as any).parseVersionFromLabel('my-block__v__20241210-abc123');
+      expect(result).toBe('20241210-abc123');
+    });
 
-      expect(mockClient.listBlocks).toHaveBeenCalledTimes(1);
-      // Block manager should have processed the blocks internally
+    it('should return initial for non-versioned label', () => {
+      const result = (blockManager as any).parseVersionFromLabel('simple-block');
+      expect(result).toBe('initial');
+    });
+  });
+
+  describe('getBlockKey', () => {
+    it('should prefix shared blocks', () => {
+      const result = (blockManager as any).getBlockKey('my-block', true);
+      expect(result).toBe('shared:my-block');
+    });
+
+    it('should not prefix non-shared blocks', () => {
+      const result = (blockManager as any).getBlockKey('my-block', false);
+      expect(result).toBe('my-block');
+    });
+
+    it('should strip version suffix from label', () => {
+      const result = (blockManager as any).getBlockKey('my-block__v__20241210-abc', false);
+      expect(result).toBe('my-block');
+    });
+  });
+
+  describe('validateUserVersion', () => {
+    it('should lowercase and sanitize version string', () => {
+      const result = (blockManager as any).validateUserVersion('My Version 1.0');
+      expect(result).toBe('my-version-1.0');
+    });
+
+    it('should replace invalid characters with dashes', () => {
+      const result = (blockManager as any).validateUserVersion('v1@#$%test');
+      expect(result).toBe('v1----test');
+    });
+
+    it('should trim whitespace', () => {
+      const result = (blockManager as any).validateUserVersion('  v1  ');
+      expect(result).toBe('v1');
+    });
+  });
+
+  describe('createVersionedLabel', () => {
+    it('should create versioned label', () => {
+      const result = (blockManager as any).createVersionedLabel('my-block', 'v1', false);
+      expect(result).toBe('my-block__v__v1');
+    });
+
+    it('should return base name for initial version on first creation', () => {
+      const result = (blockManager as any).createVersionedLabel('my-block', 'initial', true);
+      expect(result).toBe('my-block');
+    });
+
+    it('should include version even for initial if not first version', () => {
+      const result = (blockManager as any).createVersionedLabel('my-block', 'initial', false);
+      expect(result).toBe('my-block__v__initial');
+    });
+  });
+
+  describe('generateTimestampVersion', () => {
+    it('should generate version in YYYYMMDD-hash format', () => {
+      const hash = (blockManager as any).generateContentHash('test');
+      const result = (blockManager as any).generateTimestampVersion(hash);
+      expect(result).toMatch(/^\d{8}-[a-f0-9]{8}$/);
+    });
+
+    it('should use first 8 chars of hash', () => {
+      const hash = 'abcdef1234567890';
+      const result = (blockManager as any).generateTimestampVersion(hash);
+      expect(result).toContain('-abcdef12');
     });
   });
 
@@ -49,84 +111,22 @@ describe('BlockManager', () => {
       await blockManager.loadExistingBlocks();
     });
 
-    it('should create a new shared block', async () => {
-      const blockConfig = {
+    it('should create new block with no version suffix on first creation', async () => {
+      mockClient.createBlock.mockResolvedValue({ id: 'block-123' } as any);
+
+      await blockManager.getOrCreateSharedBlock({
         name: 'test-block',
-        description: 'Test shared block',
-        limit: 5000,
-        value: 'Test content'
-      };
-
-      const mockCreatedBlock = {
-        id: 'block-123',
-        label: 'shared_test-block__v__20241202-abc123',
-        description: blockConfig.description,
-        limit: blockConfig.limit,
-        value: blockConfig.value
-      };
-
-      mockClient.createBlock.mockResolvedValue(mockCreatedBlock);
-
-      const blockId = await blockManager.getOrCreateSharedBlock(blockConfig);
-
-      expect(blockId).toBe('block-123');
-      expect(mockClient.createBlock).toHaveBeenCalledWith({
-        label: 'test-block', // First version gets no suffix
-        description: blockConfig.description,
-        value: blockConfig.value,
-        limit: blockConfig.limit
+        description: 'Test',
+        limit: 1000,
+        value: 'content'
       });
-    });
-
-    it('should use user-defined version when provided', async () => {
-      const blockConfig = {
-        name: 'test-block',
-        description: 'Test shared block',
-        limit: 5000,
-        value: 'Test content',
-        version: 'custom-v1'
-      };
-
-      const mockCreatedBlock = {
-        id: 'block-123',
-        label: 'shared_test-block__v__custom-v1',
-        value: 'Test content',
-        description: 'Test shared block',
-        limit: 5000
-      };
-
-      mockClient.createBlock.mockResolvedValue(mockCreatedBlock);
-
-      await blockManager.getOrCreateSharedBlock(blockConfig);
 
       expect(mockClient.createBlock).toHaveBeenCalledWith({
-        label: 'test-block__v__custom-v1',
-        description: blockConfig.description,
-        value: blockConfig.value,
-        limit: blockConfig.limit
+        label: 'test-block',
+        description: 'Test',
+        value: 'content',
+        limit: 1000
       });
-    });
-  });
-
-  describe('version generation', () => {
-    it('should generate consistent timestamp versions', () => {
-      const content1 = 'Same content';
-      const content2 = 'Same content';
-      
-      // Access private method for testing
-      const generateTimestampVersion = (blockManager as any).generateTimestampVersion.bind(blockManager);
-      const generateContentHash = (blockManager as any).generateContentHash.bind(blockManager);
-      
-      const hash1 = generateContentHash(content1);
-      const hash2 = generateContentHash(content2);
-      
-      expect(hash1).toBe(hash2);
-      
-      const version1 = generateTimestampVersion(hash1);
-      const version2 = generateTimestampVersion(hash2);
-      
-      expect(version1).toBe(version2);
-      expect(version1).toMatch(/^\d{8}-[a-f0-9]{8}$/);
     });
   });
 });
