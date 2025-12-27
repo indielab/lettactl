@@ -22,32 +22,12 @@ describe('BlockManager', () => {
     });
   });
 
-  describe('version parsing', () => {
-    const parse = (label: string) => (manager as any).parseVersionFromLabel(label);
-
-    it('extracts version or returns initial', () => {
-      expect(parse('block__v__v1')).toBe('v1');
-      expect(parse('block')).toBe('initial');
-    });
-  });
-
   describe('getBlockKey', () => {
     const key = (name: string, shared: boolean) => (manager as any).getBlockKey(name, shared);
 
-    it('handles shared prefix and strips versions', () => {
+    it('handles shared prefix', () => {
       expect(key('block', true)).toBe('shared:block');
       expect(key('block', false)).toBe('block');
-      expect(key('block__v__v1', false)).toBe('block');
-    });
-  });
-
-  describe('createVersionedLabel', () => {
-    const label = (name: string, version: string, first: boolean) =>
-      (manager as any).createVersionedLabel(name, version, first);
-
-    it('creates correct labels', () => {
-      expect(label('block', 'v1', false)).toBe('block__v__v1');
-      expect(label('block', 'initial', true)).toBe('block');
     });
   });
 
@@ -62,6 +42,34 @@ describe('BlockManager', () => {
       expect(mockClient.createBlock).toHaveBeenCalledWith({
         label: 'test', description: 'desc', value: 'val', limit: 1000
       });
+    });
+
+    it('updates existing block when content changes', async () => {
+      mockClient.listBlocks.mockResolvedValue([
+        { id: 'id-1', label: 'test', value: 'old-val', description: 'desc', limit: 1000 }
+      ] as any);
+      mockClient.updateBlock.mockResolvedValue({ id: 'id-1' } as any);
+      await manager.loadExistingBlocks();
+
+      const result = await manager.getOrCreateSharedBlock({ name: 'test', description: 'new-desc', limit: 2000, value: 'new-val' });
+
+      expect(result).toBe('id-1');
+      expect(mockClient.updateBlock).toHaveBeenCalledWith('id-1', {
+        value: 'new-val', description: 'new-desc', limit: 2000
+      });
+    });
+
+    it('returns existing block when content unchanged', async () => {
+      mockClient.listBlocks.mockResolvedValue([
+        { id: 'id-1', label: 'test', value: 'same-val', description: 'desc', limit: 1000 }
+      ] as any);
+      await manager.loadExistingBlocks();
+
+      const result = await manager.getOrCreateSharedBlock({ name: 'test', description: 'desc', limit: 1000, value: 'same-val' });
+
+      expect(result).toBe('id-1');
+      expect(mockClient.createBlock).not.toHaveBeenCalled();
+      expect(mockClient.updateBlock).not.toHaveBeenCalled();
     });
   });
 });

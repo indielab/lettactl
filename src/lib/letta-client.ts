@@ -99,6 +99,10 @@ export class LettaClientWrapper {
     return await this.client.blocks.delete(blockId);
   }
 
+  async updateBlock(blockId: string, updateData: { value?: string; description?: string; limit?: number }) {
+    return await this.client.blocks.update(blockId, updateData);
+  }
+
   async listFolderFiles(folderId: string) {
     return await this.client.folders.files.list(folderId);
   }

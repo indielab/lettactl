@@ -70,20 +70,11 @@ describe('DiffEngine', () => {
       expect(result.toRemove).toEqual([{ name: 'block', id: 'id-1' }]);
     });
 
-    it('parses versioned labels to match base name', async () => {
-      const result = await analyze([{ label: 'block__v__20241210-abc', id: 'id-1' }], [{ name: 'block' }]);
+    it('marks existing blocks as unchanged', async () => {
+      const result = await analyze([{ label: 'block', id: 'id-1' }], [{ name: 'block' }]);
+      expect(result.unchanged).toEqual([{ name: 'block', id: 'id-1' }]);
       expect(result.toRemove).toEqual([]);
-    });
-
-    it('updates shared block when new version exists', async () => {
-      const result = await analyze(
-        [{ label: 'block', id: 'old' }],
-        [{ name: 'block', isShared: true }],
-        {},
-        undefined,
-        new Map([['block', 'new']])
-      );
-      expect(result.toUpdate[0]).toEqual({ name: 'block', currentId: 'old', newId: 'new' });
+      expect(result.toUpdate).toEqual([]);
     });
   });
 

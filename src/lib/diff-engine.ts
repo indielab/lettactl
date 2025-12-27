@@ -250,17 +250,11 @@ export class DiffEngine {
   private async analyzeBlockChanges(
     currentBlocks: any[],
     desiredBlocks: Array<{ name: string; isShared?: boolean; description?: string; limit?: number; value?: string }>,
-    memoryBlockFileHashes: Record<string, string> = {},
+    _memoryBlockFileHashes: Record<string, string> = {},
     agentName?: string,
-    sharedBlockIds?: Map<string, string>
+    _sharedBlockIds?: Map<string, string>
   ): Promise<BlockDiff> {
-    // Extract base names from versioned labels (e.g., "brand_identity__v__20251210-550e4a42" -> "brand_identity")
-    const extractBaseName = (label: string): string => {
-      const versionMatch = label.match(/^(.+?)(?:__v__.+)?$/);
-      return versionMatch ? versionMatch[1] : label;
-    };
-
-    const currentBlockNames = new Set(currentBlocks.map(b => extractBaseName(b.label)));
+    const currentBlockNames = new Set(currentBlocks.map(b => b.label));
     const desiredBlockNames = new Set(desiredBlocks.map(b => b.name));
 
     const toAdd: Array<{ name: string; id: string }> = [];
@@ -295,35 +289,11 @@ export class DiffEngine {
       }
     }
 
-    // Find blocks to remove, update (content changed), or unchanged
+    // Find blocks to remove or mark as unchanged
+    // Note: Block content updates are handled in-place by BlockManager, so we don't need toUpdate here
     for (const block of currentBlocks) {
-      const baseName = extractBaseName(block.label);
-      if (desiredBlockNames.has(baseName)) {
-        // Block exists in both current and desired
-        const blockName = baseName;
-
-        // Check if this is a shared block with a new version
-        const newSharedBlockId = sharedBlockIds?.get(blockName);
-        if (newSharedBlockId && newSharedBlockId !== block.id) {
-          console.log(`Shared block ${blockName} has new version, marking for update...`);
-          toUpdate.push({ name: blockName, currentId: block.id, newId: newSharedBlockId });
-        }
-        // Check if content has changed by comparing with file hash (per-agent blocks)
-        else if (this.hasFileBasedContent(blockName, memoryBlockFileHashes)) {
-          // This block has file-based content, assume it might have changed and mark for update
-          console.log(`Block ${blockName} has file-based content, checking for updates...`);
-
-          // Create new block with updated content and mark for update
-          const newBlockId = this.blockManager.getSharedBlockId(blockName); // Get updated block ID
-          if (newBlockId && newBlockId !== block.id) {
-            toUpdate.push({ name: blockName, currentId: block.id, newId: newBlockId });
-          } else {
-            // Content may have changed but block ID is same, still mark as update needed
-            toUpdate.push({ name: blockName, currentId: block.id, newId: block.id });
-          }
-        } else {
-          unchanged.push({ name: block.label, id: block.id });
-        }
+      if (desiredBlockNames.has(block.label)) {
+        unchanged.push({ name: block.label, id: block.id });
       } else {
         toRemove.push({ name: block.label, id: block.id });
       }
