@@ -376,6 +376,9 @@ export async function createNewAgent(
           if (verbose) console.log(`  Folder attached`);
         }
       }
+      // Close all files to prevent context window bloat
+      // Files remain searchable but aren't loaded into context
+      await client.closeAllAgentFiles(createdAgent.id);
     }
 
     // Store folder file hashes in agent metadata for future change detection

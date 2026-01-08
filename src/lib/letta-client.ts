@@ -237,6 +237,10 @@ export class LettaClientWrapper {
     return await this.client.agents.folders.list(agentId);
   }
 
+  async closeAllAgentFiles(agentId: string) {
+    return await this.client.agents.files.closeAll(agentId);
+  }
+
   // Agent Configuration Updates (all preserve conversation history)
   async updateAgentSystemPrompt(agentId: string, systemPrompt: string) {
     return await this.updateAgent(agentId, { system: systemPrompt });

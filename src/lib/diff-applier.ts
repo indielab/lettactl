@@ -142,6 +142,14 @@ export class DiffApplier {
           }
         }
       }
+
+      // Close all files after folder operations to prevent context window bloat
+      // Files remain searchable but aren't loaded into context
+      const hasFileChanges = operations.folders.toAttach.length > 0 ||
+        operations.folders.toUpdate.some(f => f.filesToAdd.length > 0 || f.filesToUpdate.length > 0);
+      if (hasFileChanges) {
+        await this.client.closeAllAgentFiles(agentId);
+      }
     }
 
     if (verbose) console.log('  Updates completed successfully');
