@@ -78,6 +78,13 @@ lettactl messages list <agent>         # View history
 lettactl messages reset <agent>        # Clear history
 ```
 
+### Observability
+```bash
+lettactl health                        # Server connectivity
+lettactl files <agent>                 # Attached files
+lettactl context <agent>               # Context window usage
+```
+
 See `reference/cli-commands.md` for all options.
 
 ## Template Mode

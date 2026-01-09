@@ -272,6 +272,13 @@ lettactl describe tool my-tool -o json
 lettactl messages my-agent             # View conversation history
 ```
 
+### Observability
+```bash
+lettactl health                       # Check server connectivity
+lettactl files my-agent               # Show attached files
+lettactl context my-agent             # Show context window usage
+```
+
 ### Validate Configuration
 ```bash
 lettactl validate -f agents.yml       # Check config syntax
@@ -829,7 +836,7 @@ lettactl apply -v -f agents.yml
 
 **Check connection:**
 ```bash
-lettactl get agents
+lettactl health
 ```
 
 **Validate config:**

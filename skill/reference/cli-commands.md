@@ -183,6 +183,33 @@ lettactl messages cancel <agent>
 lettactl messages cancel <agent> --run-ids id1,id2
 ```
 
+## health
+
+Check Letta server connectivity and status.
+
+```bash
+lettactl health
+lettactl health -v  # Verbose: show agents, tools counts
+```
+
+## files
+
+Show files attached to an agent.
+
+```bash
+lettactl files <agent>
+lettactl files <agent> -v  # Show file IDs and timestamps
+```
+
+## context
+
+Show agent context window usage.
+
+```bash
+lettactl context <agent>
+lettactl context <agent> -v  # Show health status
+```
+
 ## delete
 
 Delete resources.

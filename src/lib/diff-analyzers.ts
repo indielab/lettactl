@@ -79,7 +79,8 @@ export async function analyzeBlockChanges(
   currentBlocks: any[],
   desiredBlocks: Array<{ name: string; isShared?: boolean; description?: string; limit?: number; value?: string }>,
   blockManager: BlockManager,
-  agentName?: string
+  agentName?: string,
+  dryRun: boolean = false
 ): Promise<BlockDiff> {
   const currentBlockNames = new Set(currentBlocks.map(b => b.label));
   const desiredBlockNames = new Set(desiredBlocks.map(b => b.name));
@@ -96,9 +97,13 @@ export async function analyzeBlockChanges(
         ? blockManager.getSharedBlockId(blockConfig.name)
         : blockManager.getAgentBlockId(blockConfig.name);
 
-      // If block doesn't exist yet, create it
+      // If block doesn't exist yet, create it (unless dry-run)
       if (!blockId && !blockConfig.isShared && blockConfig.description && agentName) {
-        console.log(`Creating new memory block: ${blockConfig.name} for agent ${agentName}`);
+        if (dryRun) {
+          // In dry-run, just mark as new without creating
+          toAdd.push({ name: blockConfig.name, id: '(new)' });
+          continue;
+        }
         blockId = await blockManager.getOrCreateAgentBlock(
           {
             name: blockConfig.name,
@@ -133,7 +138,8 @@ export async function analyzeFolderChanges(
   desiredFolders: Array<{ name: string; files: FolderFileConfig[]; fileContentHashes?: Record<string, string> }>,
   folderRegistry: Map<string, string>,
   client: LettaClientWrapper,
-  previousFolderFileHashes?: Record<string, Record<string, string>>
+  previousFolderFileHashes?: Record<string, Record<string, string>>,
+  dryRun: boolean = false
 ): Promise<FolderDiff> {
   const currentFolderNames = new Set(currentFolders.map(f => f.name));
   const desiredFolderNames = new Set(desiredFolders.map(f => f.name));
@@ -155,6 +161,9 @@ export async function analyzeFolderChanges(
       const folderId = folderRegistry.get(folderConfig.name);
       if (folderId) {
         toAttach.push({ name: folderConfig.name, id: folderId });
+      } else if (dryRun) {
+        // In dry-run, show folders that would be created
+        toAttach.push({ name: folderConfig.name, id: '(new)' });
       }
     }
   }

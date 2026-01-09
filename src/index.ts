@@ -18,6 +18,9 @@ import {
   cancelMessagesCommand 
 } from './commands/messages';
 import { validateCommand } from './commands/validate';
+import { healthCommand } from './commands/health';
+import { filesCommand } from './commands/files';
+import { contextCommand } from './commands/context';
 
 // Global verbose flag for error handling
 let verboseMode = false;
@@ -235,6 +238,26 @@ program
     console.log('Config view command');
     // TODO: Implement config view logic
   });
+
+// Health check
+program
+  .command('health')
+  .description('Check Letta server connectivity and status')
+  .action(healthCommand);
+
+// Files - show agent file state
+program
+  .command('files')
+  .description('Show attached files and their open/closed state')
+  .argument('<agent>', 'agent name')
+  .action(filesCommand);
+
+// Context - show context window usage
+program
+  .command('context')
+  .description('Show context window token usage breakdown')
+  .argument('<agent>', 'agent name')
+  .action(contextCommand);
 
 // Global error handler to prevent stack traces from leaking
 process.on('unhandledRejection', (error: any) => {

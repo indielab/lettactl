@@ -9,6 +9,7 @@ import { SupabaseStorageBackend, hasSupabaseConfig } from '../lib/storage-backen
 import { applyTemplateMode } from './apply-template';
 import { processSharedBlocks, processFolders, updateExistingAgent, createNewAgent } from '../lib/apply-helpers';
 import { formatLettaError } from '../lib/error-handler';
+import { computeDryRunDiffs, displayDryRunResults } from '../lib/dry-run';
 
 
 export async function applyCommand(options: { file: string; agent?: string; match?: string; dryRun?: boolean; root?: string }, command: any) {
@@ -50,18 +51,6 @@ export async function applyCommand(options: { file: string; agent?: string; matc
       return;
     }
 
-    if (options.dryRun) {
-      for (const agent of config.agents) {
-        console.log(`Would create/update agent: ${agent.name}`);
-        if (agent.folders) {
-          for (const folder of agent.folders) {
-            console.log(`  Would create folder: ${folder.name} with ${folder.files.length} files`);
-          }
-        }
-      }
-      return;
-    }
-
     const client = new LettaClientWrapper();
     const blockManager = new BlockManager(client);
     const agentManager = new AgentManager(client);
@@ -74,6 +63,22 @@ export async function applyCommand(options: { file: string; agent?: string; matc
 
     if (verbose) console.log('Loading existing agents...');
     await agentManager.loadExistingAgents();
+
+    // Dry-run mode: compute and display diffs without applying
+    if (options.dryRun) {
+      const results = await computeDryRunDiffs(config, {
+        client,
+        blockManager,
+        agentManager,
+        diffEngine,
+        fileTracker,
+        parser,
+        agentFilter: options.agent,
+        verbose
+      });
+      displayDryRunResults(results, verbose);
+      return;
+    }
 
     // Process shared blocks
     const sharedBlockIds = await processSharedBlocks(config, blockManager, verbose);

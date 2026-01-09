@@ -94,7 +94,8 @@ export class DiffEngine {
     verbose: boolean = false,
     sharedBlockIds?: Map<string, string>,
     updatedTools?: Set<string>,
-    previousFolderFileHashes?: Record<string, Record<string, string>>
+    previousFolderFileHashes?: Record<string, Record<string, string>>,
+    dryRun: boolean = false
   ): Promise<AgentUpdateOperations> {
     
     const operations: AgentUpdateOperations = {
@@ -171,7 +172,8 @@ export class DiffEngine {
         ...(desiredConfig.sharedBlocks || []).map(name => ({ name, isShared: true }))
       ],
       this.blockManager,
-      existingAgent.name
+      existingAgent.name,
+      dryRun
     );
     operations.operationCount += operations.blocks.toAdd.length + operations.blocks.toRemove.length + operations.blocks.toUpdate.length;
 
@@ -181,7 +183,8 @@ export class DiffEngine {
       desiredConfig.folders || [],
       folderRegistry,
       this.client,
-      previousFolderFileHashes
+      previousFolderFileHashes,
+      dryRun
     );
     operations.operationCount += operations.folders.toAttach.length + operations.folders.toDetach.length +
       operations.folders.toUpdate.reduce((sum, folder) => sum + folder.filesToAdd.length + folder.filesToRemove.length + folder.filesToUpdate.length, 0);
