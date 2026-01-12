@@ -123,7 +123,9 @@ export async function applyCommand(options: { file: string; agent?: string; matc
     const toolSpinner = createSpinner('Registering tools...', spinnerEnabled).start();
     if (verbose) log('Registering tools...');
     const { toolNameToId, updatedTools, builtinTools } = await parser.registerRequiredTools(config, client, verbose, globalToolSourceHashes);
-    toolSpinner.succeed(`Registered ${Object.keys(toolNameToId).length} tools`);
+    const builtinCount = builtinTools.size;
+    const customCount = toolNameToId.size - builtinCount;
+    toolSpinner.succeed(`Registered ${customCount} custom, ${builtinCount} builtin tools`);
 
     // Register MCP servers
     if (config.mcp_servers && config.mcp_servers.length > 0) {
@@ -150,7 +152,7 @@ export async function applyCommand(options: { file: string; agent?: string; matc
     // Process folders
     const folderSpinner = createSpinner('Processing folders...', spinnerEnabled).start();
     const createdFolders = await processFolders(config, client, parser, options, verbose);
-    folderSpinner.succeed(`Processed ${Object.keys(createdFolders).length} folders`);
+    folderSpinner.succeed(`Processed ${createdFolders.size} folders`);
 
     // Process agents
     if (verbose) log('Processing agents...');
