@@ -53,10 +53,10 @@ export async function sendMessageToAgent(
       response
     };
 
-  } catch (error: any) {
+  } catch (err: any) {
     return {
       success: false,
-      error: error.message || 'Failed to send message'
+      error: err.message || 'Failed to send message'
     };
   }
 }

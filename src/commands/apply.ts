@@ -37,8 +37,8 @@ export async function applyCommand(options: { file: string; agent?: string; matc
         supabaseBackend = new SupabaseStorageBackend();
         log('Supabase backend configured for cloud storage access');
       }
-    } catch (error: any) {
-      throw new Error(`Supabase configuration error: ${error.message}`);
+    } catch (err: any) {
+      throw new Error(`Supabase configuration err: ${err.message}`);
     }
 
     const parser = new FleetParser(options.file, {
@@ -165,7 +165,7 @@ export async function applyCommand(options: { file: string; agent?: string; matc
 
     // Track results for summary (kubectl-style: continue on failure)
     const succeeded: string[] = [];
-    const failed: { name: string; error: string }[] = [];
+    const failed: { name: string; err: string }[] = [];
     const skipped: string[] = [];
 
     for (const agent of config.agents) {
@@ -275,9 +275,9 @@ export async function applyCommand(options: { file: string; agent?: string; matc
           });
           succeeded.push(agent.name);
         }
-      } catch (error: any) {
-        const errorMsg = formatLettaError(error.message);
-        failed.push({ name: agent.name, error: errorMsg });
+      } catch (err: any) {
+        const errorMsg = formatLettaError(err.message);
+        failed.push({ name: agent.name, err: errorMsg });
         warn(`Failed: ${agent.name}: ${errorMsg}`);
         // Continue processing remaining agents (kubectl-style)
       }
@@ -294,7 +294,7 @@ export async function applyCommand(options: { file: string; agent?: string; matc
       output('');
       output('Failures:');
       for (const f of failed) {
-        output(`  - ${f.name}: ${f.error}`);
+        output(`  - ${f.name}: ${f.err}`);
       }
       throw new Error(`${failed.length} agent(s) failed to apply`);
     } else if (succeeded.length > 0) {
@@ -303,7 +303,7 @@ export async function applyCommand(options: { file: string; agent?: string; matc
       log(`Apply completed: all ${skipped.length} agents already up to date`);
     }
 
-  } catch (error: any) {
-    throw new Error(`Apply failed: ${formatLettaError(error.message || error)}`);
+  } catch (err: any) {
+    throw new Error(`Apply failed: ${formatLettaError(err.message || err)}`);
   }
 }

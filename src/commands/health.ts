@@ -18,7 +18,7 @@ export async function healthCommand(options: { output?: string }, command: any) 
       server_url: baseUrl || null,
       status: 'unknown',
       version: null,
-      error: null
+      err: null
     };
 
     if (!baseUrl) {
@@ -41,9 +41,9 @@ export async function healthCommand(options: { output?: string }, command: any) 
       result.version = health.version;
       OutputFormatter.handleJsonOutput(result, 'json');
       return;
-    } catch (error: any) {
+    } catch (err: any) {
       result.status = 'error';
-      result.error = error.cause?.code || error.code || error.message;
+      result.err = err.cause?.code || err.code || err.message;
       OutputFormatter.handleJsonOutput(result, 'json');
       process.exit(1);
     }
@@ -133,8 +133,8 @@ export async function healthCommand(options: { output?: string }, command: any) 
       ? '\n' + STATUS.ok + chalk.green(' Letta server is healthy')
       : '\nLetta server is healthy');
 
-  } catch (error: any) {
-    const msg = error.cause?.code || error.code || error.message;
+  } catch (err: any) {
+    const msg = err.cause?.code || err.code || err.message;
     if (msg === 'ECONNREFUSED') {
       output(fancy
         ? `${STATUS.fail} Connection refused - is Letta server running at ${baseUrl}?`

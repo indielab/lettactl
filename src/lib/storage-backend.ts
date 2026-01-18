@@ -285,12 +285,12 @@ export class SupabaseStorageBackend {
       const arrayBuffer = await data.arrayBuffer()
       return Buffer.from(arrayBuffer)
 
-    } catch (error: any) {
-      if (error.message.includes('Failed to download')) {
-        throw error;
+    } catch (err: any) {
+      if (err.message.includes('Failed to download')) {
+        throw err;
       }
 
-      StorageErrorHandler.handleProviderError(error, {
+      StorageErrorHandler.handleProviderError(err, {
         provider: 'supabase',
         operation: 'download',
         bucket,
@@ -306,7 +306,7 @@ export class SupabaseStorageBackend {
       const fileName = pathParts.pop();
       const folder = pathParts.join('/') || '';
       
-      const { data: listData, error: listError } = await this.supabase.storage
+      const { data: listData, err: listError } = await this.supabase.storage
         .from(bucket)
         .list(folder, { 
           search: fileName,
@@ -351,13 +351,13 @@ export class SupabaseStorageBackend {
       
       return await data.text()
       
-    } catch (error: any) {
+    } catch (err: any) {
       // Re-throw our custom errors, handle unexpected ones through error handler
-      if (error.message.includes('Failed to download')) {
-        throw error;
+      if (err.message.includes('Failed to download')) {
+        throw err;
       }
-      
-      StorageErrorHandler.handleProviderError(error, {
+
+      StorageErrorHandler.handleProviderError(err, {
         provider: 'supabase',
         operation: 'download', 
         bucket,
@@ -388,8 +388,8 @@ export class SupabaseStorageBackend {
         pathPrefix ? `${pathPrefix}/${file.name}` : file.name
       ) || []
       
-    } catch (error: any) {
-      StorageErrorHandler.handleProviderError(error, {
+    } catch (err: any) {
+      StorageErrorHandler.handleProviderError(err, {
         provider: 'supabase',
         operation: 'list',
         bucket,

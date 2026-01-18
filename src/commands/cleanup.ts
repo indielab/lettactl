@@ -91,8 +91,8 @@ async function cleanupOrphanedBlocks(
           await client.deleteBlock(block.id);
           deleted++;
           if (isVerbose) log(`Deleted block: ${block.label || block.id}`);
-        } catch (error: any) {
-          warn(`Failed to delete block ${block.label || block.id}: ${error.message}`);
+        } catch (err: any) {
+          warn(`Failed to delete block ${block.label || block.id}: ${err.message}`);
         }
       }
 
@@ -165,8 +165,8 @@ async function cleanupOrphanedFolders(
           await client.deleteFolder(folder.id);
           deleted++;
           if (isVerbose) log(`Deleted folder: ${folder.name || folder.id}`);
-        } catch (error: any) {
-          warn(`Failed to delete folder ${folder.name || folder.id}: ${error.message}`);
+        } catch (err: any) {
+          warn(`Failed to delete folder ${folder.name || folder.id}: ${err.message}`);
         }
       }
 

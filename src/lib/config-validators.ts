@@ -64,8 +64,8 @@ export class FleetConfigValidator {
           }
           agentNames.add(agent.name);
         }
-      } catch (error: any) {
-        throw new Error(`Agent ${index + 1}: ${error.message}`);
+      } catch (err: any) {
+        throw new Error(`Agent ${index + 1}: ${err.message}`);
       }
     });
   }
@@ -266,8 +266,8 @@ export class MemoryBlockValidator {
           }
           blockNames.add(block.name);
         }
-      } catch (error: any) {
-        throw new Error(`Memory block ${index + 1}: ${error.message}`);
+      } catch (err: any) {
+        throw new Error(`Memory block ${index + 1}: ${err.message}`);
       }
     });
   }
@@ -375,8 +375,8 @@ export class FoldersValidator {
     folders.forEach((folder, index) => {
       try {
         this.validateFolder(folder);
-      } catch (error: any) {
-        throw new Error(`Folder ${index + 1}: ${error.message}`);
+      } catch (err: any) {
+        throw new Error(`Folder ${index + 1}: ${err.message}`);
       }
     });
   }
@@ -435,8 +435,8 @@ export class SharedBlockValidator {
     blocks.forEach((block, index) => {
       try {
         MemoryBlockValidator['validateBlock'](block); // Reuse memory block validation
-      } catch (error: any) {
-        throw new Error(`Shared block ${index + 1}: ${error.message}`);
+      } catch (err: any) {
+        throw new Error(`Shared block ${index + 1}: ${err.message}`);
       }
     });
   }
