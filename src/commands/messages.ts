@@ -4,6 +4,7 @@ import { normalizeResponse } from '../lib/response-normalizer';
 import { OutputFormatter } from '../lib/ux/output-formatter';
 import { createSpinner, getSpinnerEnabled } from '../lib/ux/spinner';
 import { sendMessageToAgent } from '../lib/message-sender';
+import { bulkSendMessage } from '../lib/bulk-messenger';
 import { log, output, error } from '../lib/logger';
 
 /**
@@ -103,18 +104,53 @@ export async function listMessagesCommand(
 }
 
 export async function sendMessageCommand(
-  agentName: string,
-  message: string,
+  agentNameOrMessage: string,
+  messageOrUndefined: string | undefined,
   options: {
     stream?: boolean;
     async?: boolean;
     maxSteps?: number;
     enableThinking?: boolean;
+    all?: string;
+    file?: string;
+    confirm?: boolean;
+    timeout?: number;
   },
   command: any
 ) {
   const verbose = command.parent?.opts().verbose || false;
-  
+
+  // Handle bulk messaging mode
+  if (options.all || options.file) {
+    // When using --all, first arg is the message (agent is optional)
+    const message = messageOrUndefined || agentNameOrMessage;
+    if (!message) {
+      error('Message is required');
+      process.exit(1);
+    }
+    try {
+      await bulkSendMessage(message, {
+        pattern: options.all,
+        configFile: options.file,
+        confirm: options.confirm,
+        timeout: options.timeout,
+        verbose,
+      }, output);
+      return;
+    } catch (err: any) {
+      error(`Bulk message failed: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // Single agent mode - both args required
+  const agentName = agentNameOrMessage;
+  const message = messageOrUndefined;
+  if (!agentName || !message) {
+    error('Both agent name and message are required');
+    process.exit(1);
+  }
+
   try {
     const client = new LettaClientWrapper();
     const resolver = new AgentResolver(client);
