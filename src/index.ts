@@ -238,13 +238,17 @@ program
 // Send message to agent
 program
   .command('send')
-  .description('Send a message to an agent')
-  .argument('<agent>', 'agent name')
-  .argument('<message>', 'message to send')
+  .description('Send a message to an agent (or multiple agents with --all)')
+  .argument('[agent]', 'agent name (not required when using --all)')
+  .argument('[message]', 'message to send')
   .option('--stream', 'stream the response')
   .option('--async', 'send message asynchronously')
   .option('--max-steps <number>', 'maximum processing steps', parseInt)
   .option('--enable-thinking', 'enable agent reasoning')
+  .option('--all <pattern>', 'send to all agents matching glob pattern (async mode)')
+  .option('-f, --file <path>', 'target agents from fleet config file')
+  .option('--confirm', 'skip confirmation prompt for bulk operations')
+  .option('--timeout <seconds>', 'timeout per agent in seconds for bulk operations', parseInt)
   .action(sendMessageCommand);
 
 // Reset agent messages

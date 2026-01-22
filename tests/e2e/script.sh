@@ -967,6 +967,58 @@ fi
 $CLI delete agent e2e-first-message-test --force > /dev/null 2>&1 || true
 
 # ============================================================================
+# Test: Bulk Messaging
+# ============================================================================
+
+section "Bulk Messaging"
+
+# Cleanup any existing test agents
+$CLI delete agent e2e-bulk-msg-1 --force > /dev/null 2>&1 || true
+$CLI delete agent e2e-bulk-msg-2 --force > /dev/null 2>&1 || true
+$CLI delete agent e2e-bulk-msg-3 --force > /dev/null 2>&1 || true
+
+# Create 3 test agents
+info "Creating 3 test agents for bulk messaging..."
+if $CLI apply -f "$FIXTURES/fleet-bulk-message-test.yml" > $OUT 2>&1; then
+    pass "Created bulk message test agents"
+else
+    fail "Failed to create bulk message test agents"
+    cat $OUT
+fi
+
+# Verify agents exist
+agent_exists "e2e-bulk-msg-1" && pass "Agent 1 created" || fail "Agent 1 not created"
+agent_exists "e2e-bulk-msg-2" && pass "Agent 2 created" || fail "Agent 2 not created"
+agent_exists "e2e-bulk-msg-3" && pass "Agent 3 created" || fail "Agent 3 not created"
+
+# Send bulk message
+info "Sending bulk message to e2e-bulk-msg-* agents..."
+if $CLI send --all "e2e-bulk-msg-*" "Hello, what is your name?" --confirm > $OUT 2>&1; then
+    if output_contains "Completed: 3/3"; then
+        pass "Bulk message sent to all 3 agents"
+    else
+        fail "Bulk message did not complete for all agents"
+        cat $OUT
+    fi
+else
+    fail "Bulk message command failed"
+    cat $OUT
+fi
+
+# Verify OK status
+if output_contains "OK e2e-bulk-msg-1" && output_contains "OK e2e-bulk-msg-2" && output_contains "OK e2e-bulk-msg-3"; then
+    pass "All agents responded OK"
+else
+    fail "Not all agents responded OK"
+    cat $OUT
+fi
+
+# Cleanup
+$CLI delete agent e2e-bulk-msg-1 --force > /dev/null 2>&1 || true
+$CLI delete agent e2e-bulk-msg-2 --force > /dev/null 2>&1 || true
+$CLI delete agent e2e-bulk-msg-3 --force > /dev/null 2>&1 || true
+
+# ============================================================================
 # Cleanup
 # ============================================================================
 
