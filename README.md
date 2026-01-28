@@ -389,6 +389,20 @@ yarn install lettactl
 pnpm install lettactl
 ```
 
+## SDK Options
+
+```typescript
+import { LettaCtl } from 'lettactl';
+
+const lettactl = new LettaCtl({
+  lettaBaseUrl: 'http://localhost:8283',
+  lettaApiKey: 'optional-api-key',      // For Letta Cloud
+  root: '/path/to/project',             // Where .lettactl/fleet.yaml is stored (defaults to cwd)
+});
+```
+
+The SDK automatically manages a `.lettactl/fleet.yaml` file in the `root` directory to track deployed agents.
+
 ## Three Usage Patterns
 
 ### 1. Dynamic YAML Generation
@@ -535,6 +549,24 @@ for (const user of users) {
 
 await lettactl.deployFleet(batchFleet.build());
 ```
+
+### Agent Deletion
+
+Delete agents programmatically with full resource cleanup:
+
+```typescript
+// Delete a single agent (cleans up blocks, folders, and updates .lettactl/fleet.yaml)
+await lettactl.deleteAgent('user-123-assistant');
+
+// Safe to call even if .lettactl/fleet.yaml doesn't exist
+await lettactl.deleteAgent('orphaned-agent');
+```
+
+`deleteAgent()` performs the same cleanup as the CLI `delete` command:
+- Removes agent-specific memory blocks (preserves shared blocks)
+- Removes agent-specific folders (preserves shared folders)
+- Deletes the agent from the Letta server
+- Updates `.lettactl/fleet.yaml` (removes the agent entry, or deletes the file if no agents remain)
 
 ---
 
@@ -905,13 +937,18 @@ agents:
 
 ## Implementation Notes
 
-### Stateless Design
+### Stateless CLI, Managed SDK
 
-Like kubectl, lettactl is completely stateless:
+The **CLI** is completely stateless like kubectl:
 - No local configuration files or session data stored
 - Each command is independent and relies on remote APIs (Letta, Supabase)
-- All agent state is managed by the Letta server, not lettactl
 - Consistent behavior across different machines and environments
+
+The **SDK** optionally manages a `.lettactl/fleet.yaml` file to track deployed agents:
+- Written after `deployFleet()` for fleet file persistence
+- Updated by `deleteAgent()` to keep the file in sync
+- Location controlled by the `root` option
+- All agent state is still managed by the Letta server
 
 ### Debugging & Fleet Inspection
 
