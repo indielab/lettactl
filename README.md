@@ -95,7 +95,7 @@ agents:
       - name: documents
         files:
           - "files/*"  # Auto-discover all files in files/
-    embedding: "letta/letta-free"
+    embedding: "openai/text-embedding-3-small"
 
   # 2. Cloud-powered agent using Supabase storage  
   - name: cloud-assistant
@@ -118,7 +118,7 @@ agents:
           provider: supabase
           bucket: test-bucket
           path: knowledge/example.md
-    embedding: "letta/letta-free"
+    embedding: "openai/text-embedding-3-small"
 ```
 
 Deploy the entire fleet:
@@ -160,7 +160,7 @@ lettactl create agent advanced-agent \
   --model "google_ai/gemini-2.5-pro" \
   --system "You are an expert assistant." \
   --context-window 32000 \
-  --embedding "letta/letta-free" \
+  --embedding "openai/text-embedding-3-small" \
   --tags "production,assistant"
 ```
 
@@ -438,7 +438,7 @@ agents:
       value: "You are an assistant for user ${userId}."
     shared_blocks:  # Use shared memory blocks
       - shared-guidelines
-    embedding: "letta/letta-free"
+    embedding: "openai/text-embedding-3-small"
 `;
 
 // Deploy directly from YAML string (no file I/O needed)
@@ -745,7 +745,8 @@ lettactl apply -f agents.yml
 agents:
   - name: agent-name                    # Required: unique identifier
     description: "What this agent does" # Required: human description
-    
+    reasoning: true                     # Optional: enable reasoning (default: true)
+
     # LLM configuration (required, should be first)
     llm_config:
       model: "google_ai/gemini-2.5-pro" # Required
@@ -785,7 +786,7 @@ agents:
           - "files/*"                   # Auto-discover files
           - "files/specific-file.pdf"   # Specific files
     
-    embedding: "letta/letta-free"       # Optional: embedding model
+    embedding: "openai/text-embedding-3-small"       # Optional: embedding model
 ```
 
 ### Shared Blocks Schema
