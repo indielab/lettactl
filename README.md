@@ -3,6 +3,7 @@
 [![CI](https://github.com/nouamanecodes/lettactl/actions/workflows/ci.yml/badge.svg)](https://github.com/nouamanecodes/lettactl/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Socket Badge](https://socket.dev/api/badge/npm/package/lettactl)](https://socket.dev/npm/package/lettactl)
 
 ![LettaCTL](assets/main.png)
 
