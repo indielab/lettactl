@@ -159,12 +159,15 @@ lettactl apply -f agents.yml --manifest
 # Generates agents.manifest.json with agent IDs, tool IDs, block IDs, etc.
 ```
 
-### Create Agents
+### Create Agents from CLI without Files
+
+You can also create agents directly from the CLI
+
 ```bash
 # Create basic agent
 lettactl create agent my-agent --description "My helpful assistant"
 
-# Create with full configuration
+# Create with more configuration
 lettactl create agent advanced-agent \
   --description "Advanced AI assistant" \
   --model "google_ai/gemini-2.5-pro" \
@@ -174,7 +177,7 @@ lettactl create agent advanced-agent \
   --tags "production,assistant"
 ```
 
-### Update Agents
+### Update Agents from CLI without files
 ```bash
 # Update description and model
 lettactl update agent my-agent \
@@ -242,6 +245,7 @@ lettactl apply -f agents.yml
 | Compare versions | `git diff HEAD~1 agents.yml` |
 
 ### Message Operations
+![Message Operations](assets/messages.png)
 ```bash
 # View conversation history (last 10 messages by default)
 lettactl messages my-agent
