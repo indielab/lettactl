@@ -184,10 +184,24 @@ Use safe alternatives:
 - `git stash` to save uncommitted changes
 - `gh pr merge` handles local sync automatically
 
+## Breaking Changes
+
+When a feature changes YAML syntax or removes backward compatibility:
+
+1. **Ask first** - Confirm with user before proceeding with breaking changes
+2. **Minor version bump** - Breaking changes bump minor version (e.g., 0.10.0 → 0.11.0)
+3. **Roadmap marker** - Add `(warning: breaking syntax change)` to the completed item in roadmap
+
+Example roadmap entry:
+```
+- [x] Make agent_owned field mandatory on memory blocks (#193) (warning: breaking syntax change)
+```
+
 ## Version & Release
 
 ```bash
 # 1. Bump version in package.json (x.x.x → x.x.x+1)
+#    For breaking changes: bump minor version (x.x.x → x.y.0)
 # 2. Commit
 git add package.json
 git commit -m "build: bump v0.9.2"
