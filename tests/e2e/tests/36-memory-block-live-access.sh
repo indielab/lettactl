@@ -21,10 +21,10 @@ agent_exists "$AGENT" && pass "Agent created" || fail "Agent not created"
 
 # Verify no memory blocks initially (except default ones)
 $CLI get blocks --agent "$AGENT" > $OUT 2>&1
-if output_contains "secret_code"; then
-    fail "secret_code block should not exist yet"
+if output_contains "test_data"; then
+    fail "test_data block should not exist yet"
 else
-    pass "No secret_code block initially"
+    pass "No test_data block initially"
 fi
 
 # Step 2: Add memory block via apply
@@ -33,13 +33,13 @@ $CLI apply -f "$FIXTURES/fleet-memory-block-live-updated.yml" > $OUT 2>&1
 
 # Verify memory block is attached
 $CLI get blocks --agent "$AGENT" > $OUT 2>&1
-output_contains "secret_code" && pass "secret_code block attached" || fail "secret_code block not attached"
+output_contains "test_data" && pass "test_data block attached" || fail "test_data block not attached"
 
 # Step 3: Verify agent can access the block content
 info "Sending message to agent to verify block access..."
-$CLI send "$AGENT" "What is in your secret_code memory block? Tell me the exact value." > $OUT 2>&1
+$CLI send "$AGENT" "What is in your test_data memory block? Tell me the exact value." > $OUT 2>&1
 
-# Check if agent response contains the secret code
+# Check if agent response contains the test value
 if output_contains "PHOENIX-42"; then
     pass "Agent can access memory block content"
 else

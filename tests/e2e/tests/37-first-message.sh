@@ -34,9 +34,9 @@ fi
 # Verify agent exists
 agent_exists "$AGENT" && pass "Agent created" || fail "Agent not created"
 
-# Ask agent about the secret code from the first message
+# Ask agent about the calibration phrase from the first message
 info "Verifying agent remembers first message content..."
-$CLI send "$AGENT" "What secret code were you told to remember? Tell me the exact code." > $OUT 2>&1
+$CLI send "$AGENT" "What calibration phrase were you told to remember? Tell me the exact phrase." > $OUT 2>&1
 
 if output_contains "CALIBRATION-99"; then
     pass "Agent remembers content from first_message"

@@ -9,8 +9,8 @@ agents:
     model: google_ai/gemini-2.0-flash-lite
     context_window: 32000
   memory_blocks:
-  - name: secret_code
-    description: Contains a secret code the agent should be able to read
+  - name: test_data
+    description: Contains test data the agent should be able to read
     limit: 1000
-    value: The secret code is PHOENIX-42
+    value: The test value is PHOENIX-42
     agent_owned: true
