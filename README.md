@@ -568,30 +568,49 @@ lettactl describe mcp-servers my-server
 lettactl delete mcp-servers my-server --force
 ```
 
-MCP servers are created/updated automatically during `lettactl apply` when defined in your configuration.
+MCP servers are created/updated automatically during `lettactl apply` when defined in your configuration. MCP servers are **global resources** — defined once and shared across all agents. Each agent picks which tools it needs via `mcp_tools`.
 
 **Using MCP Tools in Agents:**
 
-Once MCP servers are defined, reference their tools in agent configs using `mcp_tools`:
-
 ```yaml
 mcp_servers:
+  # Remote server (recommended for production)
+  - name: weather-api
+    type: streamable_http
+    server_url: "https://weather.example.com/mcp"
+    auth_token: "${WEATHER_API_KEY}"
+
+  # Local server (for development/self-hosted only)
   - name: filesystem
     type: stdio
     command: npx
     args: ["-y", "@anthropic/mcp-filesystem"]
 
 agents:
-  - name: file-agent
+  - name: agent-a
     mcp_tools:
+      - server: weather-api
+        tools: all                    # All tools from server
       - server: filesystem
-        tools: all              # Include all tools from the server
-      # Or pick specific tools:
-      # - server: filesystem
-      #   tools: [read_file, write_file]
+        tools: [read_file, list_dir]  # Specific tools only
+
+  - name: agent-b
+    mcp_tools:
+      - server: weather-api
+        tools: [get_forecast]         # Different subset, same server
 ```
 
-The tools are expanded and attached to the agent during apply.
+During `apply`, `mcp_tools` declarations are expanded into concrete tool names and merged into the agent's tool list. Two agents can reference the same MCP server with different tool subsets.
+
+**Transport types:**
+
+| Type | Use Case | Platform |
+|------|----------|----------|
+| `streamable_http` | Production remote servers | Cloud + self-hosted |
+| `sse` | Legacy (deprecated) | Cloud + self-hosted |
+| `stdio` | Local dev/testing | Self-hosted only |
+
+Use `streamable_http` for remote MCP servers. `sse` still works but is deprecated by Letta. `stdio` runs a local subprocess, so it only works on self-hosted.
 
 ---
 
@@ -1069,17 +1088,17 @@ MCP (Model Context Protocol) servers provide external tool capabilities to your 
 
 ```yaml
 mcp_servers:
-  # SSE server (Server-Sent Events)
-  - name: my-sse-server
-    type: sse
-    server_url: http://localhost:3001/sse
-    auth_header: Authorization           # Optional
-    auth_token: Bearer my-token          # Optional
+  # Streamable HTTP (recommended for production)
+  - name: my-remote-server
+    type: streamable_http
+    server_url: https://mcp.example.com/api
+    auth_header: Authorization           # Optional (header name)
+    auth_token: "${MY_API_KEY}"          # Optional (supports env vars)
     custom_headers:                      # Optional
       X-Custom-Header: value
 
-  # Stdio server (local process)
-  - name: my-stdio-server
+  # Stdio (local development / self-hosted only)
+  - name: my-local-server
     type: stdio
     command: /usr/bin/python3
     args:
@@ -1089,18 +1108,19 @@ mcp_servers:
       DEBUG: "true"
       LOG_LEVEL: "info"
 
-  # Streamable HTTP server
-  - name: my-http-server
-    type: streamable_http
-    server_url: https://mcp.example.com/api
-    auth_header: Authorization           # Optional
-    auth_token: Bearer my-token          # Optional
+  # SSE (deprecated — use streamable_http instead)
+  - name: my-legacy-server
+    type: sse
+    server_url: http://localhost:3001/sse
 ```
 
-**MCP Server Types:**
-- `sse` - Server-Sent Events for real-time communication
-- `stdio` - Local process communication via stdin/stdout
-- `streamable_http` - HTTP-based streaming protocol
+**Transport types:**
+
+| Type | Status | Platform | Use Case |
+|------|--------|----------|----------|
+| `streamable_http` | **Recommended** | Cloud + self-hosted | Remote MCP servers with auth |
+| `stdio` | Supported | Self-hosted only | Local dev, subprocess-based servers |
+| `sse` | **Deprecated** | Cloud + self-hosted | Legacy — migrate to `streamable_http` |
 
 **Automatic Updates:**
 When you change an MCP server's URL, command, or args in your configuration and run `apply`, lettactl automatically detects the change and updates the server.
