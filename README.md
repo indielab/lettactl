@@ -1352,6 +1352,31 @@ export LETTA_BASE_URL=https://api.letta.com
 export LETTA_API_KEY=your_cloud_key  # Required for cloud
 ```
 
+### Conversation Search (Turbopuffer)
+
+Letta agents have a built-in `conversation_search` tool that lets them search through past conversations. By default, this uses basic SQL text matching (ILIKE) which only finds exact substrings — not useful for natural language queries like "what did we discuss about the campaign?"
+
+For **semantic conversation search**, you need [Turbopuffer](https://turbopuffer.com) — a vector database that Letta uses to embed and search messages. Add these environment variables to your Letta server:
+
+```bash
+LETTA_USE_TPUF=true
+LETTA_TPUF_API_KEY=your_turbopuffer_api_key
+LETTA_EMBED_ALL_MESSAGES=true
+```
+
+This also requires `OPENAI_API_KEY` to be set (uses `text-embedding-3-small` for embeddings).
+
+**Important:** Only messages sent **after** enabling Turbopuffer are indexed. Existing conversation history is not retroactively embedded.
+
+If you're running Letta in Docker, add these to your `docker-compose.yml`:
+
+```yaml
+environment:
+  - LETTA_USE_TPUF=true
+  - LETTA_TPUF_API_KEY=$LETTA_TPUF_API_KEY
+  - LETTA_EMBED_ALL_MESSAGES=true
+```
+
 ### Supabase Storage Integration
 
 For cloud storage support, lettactl can read agent configuration files from Supabase buckets. More cloud storage options coming soon.
