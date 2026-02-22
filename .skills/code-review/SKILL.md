@@ -44,7 +44,11 @@ Evaluate:
 - Technical debt hotspots.
 - Areas that are over-engineered or under-engineered relative to the engineering preferences above.
 
-### 3. Performance Review
+### 3. Send subagents to the SDK
+
+For all SDK related changes, always send a subagent to check node_modules for the SDK to check the proper usage of the libraries
+
+### 4. Performance Review
 
 Evaluate:
 
