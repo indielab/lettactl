@@ -6,14 +6,15 @@
 [![Socket Badge](https://socket.dev/api/badge/npm/package/lettactl)](https://socket.dev/npm/package/lettactl)
 
 ![LettaCTL](assets/main.png)
+![lettactl demo](assets/lettactl_demo.gif)
 
 A kubectl-style CLI for managing stateful Letta AI agent fleets with declarative configuration. Think "Docker Compose" but for AI agents - define your entire agent setup in YAML and deploy with one command.
 
 # Need help? 
 
-Read the [official docs](https://lettactl.dev) or join the [Letta Discord](https://discord.com/invite/letta) for support and discussions.
+### Read the [official docs](https://lettactl.dev) or join the [Letta Discord](https://discord.com/invite/letta) for support and discussions.
 
-![lettactl demo](assets/lettactl_demo.gif)
+
 ## Two Ways to Use LettaCtl
 
 | **CLI Tool** | **Programmatic SDK** |
