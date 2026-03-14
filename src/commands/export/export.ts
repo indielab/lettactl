@@ -121,7 +121,7 @@ export default async function exportCommand(
       use_legacy_format: options.legacyFormat || false
     });
 
-    // Determine output filename — .af is the default extension for agentfiles
+    // Determine output filename
     const defaultExt = options.format === 'json' ? '.json' : '.af';
     const outputFile = options.output || `${agent.name}${defaultExt}`;
     const resolvedPath = path.resolve(outputFile);
