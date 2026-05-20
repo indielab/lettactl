@@ -60,4 +60,42 @@ describe('LettaCtl', () => {
   it('creates FleetConfigBuilder', () => {
     expect(ctl.createFleetConfig()).toBeInstanceOf(FleetConfigBuilder);
   });
+
+  it('validates fleet configs containing a memfs memory: section', () => {
+    const withMemfs: FleetConfig = {
+      agents: [{
+        name: 'a',
+        description: 'd',
+        llm_config: { model: 'm', context_window: 1000 },
+        system_prompt: { value: 'p' },
+        memory: {
+          mode: 'memfs',
+          template_dir: 'templates',
+          from_blocks: [{ block: 'persona', to: 'system/persona.md' }],
+        },
+      }],
+    };
+    expect(ctl.validateFleet(withMemfs)).toBe(true);
+  });
+
+  it('rejects memfs memory section with no source (no template_dir, no from_blocks)', () => {
+    const invalid: FleetConfig = {
+      agents: [{
+        name: 'a',
+        description: 'd',
+        llm_config: { model: 'm', context_window: 1000 },
+        system_prompt: { value: 'p' },
+        memory: { mode: 'memfs' } as any,
+      }],
+    };
+    expect(ctl.validateFleet(invalid)).toBe(false);
+  });
+});
+
+describe('SDK exports', () => {
+  it('re-exports GIT_MEMORY_ENABLED_TAG constant', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const sdk = require('../../src/sdk');
+    expect(sdk.GIT_MEMORY_ENABLED_TAG).toBe('git-memory-enabled');
+  });
 });

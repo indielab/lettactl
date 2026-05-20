@@ -262,7 +262,8 @@ export class FleetConfigBuilder {
   }
 }
 
-export { FleetConfig, AgentConfig } from './types/fleet-config';
+export { FleetConfig, AgentConfig, AgentMemoryConfig } from './types/fleet-config';
 export { Run } from './types/run';
 export { DeployResult } from './commands/apply/types';
 export { isRunTerminal, getEffectiveRunStatus } from './lib/messaging/run-utils';
+export { GIT_MEMORY_ENABLED_TAG } from './lib/memfs-reconciler/plan';
