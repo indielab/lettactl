@@ -2,6 +2,11 @@ export interface ApplyOptions {
   file: string;
   agent?: string;
   match?: string;
+  /** Comma-separated tag filter — only agents whose `tags` array contains ALL
+   *  listed tags get applied. Lets callers do incremental scoped deploys
+   *  (e.g. `--scope tenant:<brand-id>`) without redeploying the whole fleet.
+   *  See nouamanecodes/lettactl#380. */
+  scope?: string;
   dryRun?: boolean;
   force?: boolean;
   root?: string;

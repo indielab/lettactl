@@ -66,7 +66,7 @@ export class LettaCtl {
     }
   }
 
-  async deployFleet(config: FleetConfig, options?: { dryRun?: boolean; agentPattern?: string; match?: string }): Promise<DeployResult> {
+  async deployFleet(config: FleetConfig, options?: { dryRun?: boolean; agentPattern?: string; match?: string; scope?: string }): Promise<DeployResult> {
     FleetConfigValidator.validate(config);
 
     const tempDir = path.join(os.tmpdir(), `lettactl-${Date.now()}`);
@@ -85,6 +85,7 @@ export class LettaCtl {
             file: tempFile,
             agent: options?.agentPattern,
             match: options?.match,
+            scope: options?.scope,
             dryRun: options?.dryRun || false,
             root: this.root
           },
@@ -121,7 +122,7 @@ export class LettaCtl {
     this.removeAgentFromFleetFile(agentName);
   }
 
-  async deployFromYaml(yamlPath: string, options?: { dryRun?: boolean; agentPattern?: string; match?: string; rootPath?: string }): Promise<DeployResult> {
+  async deployFromYaml(yamlPath: string, options?: { dryRun?: boolean; agentPattern?: string; match?: string; scope?: string; rootPath?: string }): Promise<DeployResult> {
     setQuietMode(true);
     try {
       return await applyCommand(
@@ -129,6 +130,7 @@ export class LettaCtl {
           file: yamlPath,
           agent: options?.agentPattern,
           match: options?.match,
+          scope: options?.scope,
           dryRun: options?.dryRun || false,
           root: options?.rootPath
         },
@@ -143,7 +145,7 @@ export class LettaCtl {
     }
   }
 
-  async deployFromYamlString(yamlContent: string, options?: { dryRun?: boolean; agentPattern?: string; match?: string }): Promise<DeployResult> {
+  async deployFromYamlString(yamlContent: string, options?: { dryRun?: boolean; agentPattern?: string; match?: string; scope?: string }): Promise<DeployResult> {
     const config = yaml.load(yamlContent) as FleetConfig;
     return await this.deployFleet(config, options);
   }

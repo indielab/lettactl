@@ -117,6 +117,7 @@ program
   .option('-f, --file <path>', 'agent YAML configuration file', 'agents.yml')
   .option('--agent <pattern>', 'deploy only agents matching pattern')
   .option('--match <pattern>', 'apply template config to all existing agents matching glob pattern')
+  .option('--scope <tags>', 'deploy only agents whose tags include ALL listed tags (comma-separated). Example: --scope tenant:acme,role:draper')
   .option('--dry-run', 'show what would be created without making changes')
   .option('--force', 'remove resources not in config (strict reconciliation)')
   .option('--root <path>', 'root directory for resolving file paths')

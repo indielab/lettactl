@@ -109,6 +109,36 @@ export async function applyCommand(options: ApplyOptions, command: any): Promise
     if (options.canary && options.match) {
       throw new Error('--canary cannot be combined with --match (template mode)');
     }
+    if (options.scope && options.match) {
+      throw new Error('--scope cannot be combined with --match (template mode)');
+    }
+    if (options.scope && options.canary) {
+      throw new Error('--scope cannot be combined with --canary');
+    }
+
+    // --scope <tags>: filter the agent set to those whose tags include ALL
+    // listed tags (AND semantics). Lets callers do incremental scoped deploys
+    // without redeploying the full fleet — primary use case is per-tenant
+    // adds (`--scope tenant:<id>`) so only the new tenant's agents touch
+    // Letta. Shared blocks / folders / tools still get processed because
+    // they're fleet-level and the filtered agents may reference them.
+    // See nouamanecodes/lettactl#380.
+    if (options.scope) {
+      const requiredTags = options.scope.split(',').map(t => t.trim()).filter(Boolean);
+      if (requiredTags.length === 0) {
+        throw new Error('--scope requires at least one tag');
+      }
+      const before = config.agents.length;
+      config.agents = config.agents.filter(a => {
+        const tags = (a.tags || []) as string[];
+        return requiredTags.every(req => tags.includes(req));
+      });
+      log(`--scope filter: ${config.agents.length}/${before} agents match [${requiredTags.join(', ')}]`);
+      if (config.agents.length === 0) {
+        log('No agents matched scope filter — nothing to apply');
+        return { agents: {}, created: [], updated: [], unchanged: [] };
+      }
+    }
 
     // Canary mode: rewrite agent names or handle cleanup
     const canaryPrefix = options.canaryPrefix || DEFAULT_CANARY_PREFIX;
